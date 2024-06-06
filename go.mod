@@ -3,6 +3,7 @@ module github.com/1f349/azalea
 go 1.22.3
 
 require (
+	github.com/256dpi/newdns v0.2.4
 	github.com/charmbracelet/log v0.4.0
 	github.com/golang-migrate/migrate/v4 v4.17.1
 	github.com/google/subcommands v1.2.0

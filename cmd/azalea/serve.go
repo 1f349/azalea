@@ -76,6 +76,6 @@ func normalLoad(startUp server.Conf, wd string) {
 
 	exit_reload.ExitReload("Azalea", func() {}, func() {
 		// stop http server
-		_ = srv.Close()
+		srv.Close()
 	})
 }
