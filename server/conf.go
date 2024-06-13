@@ -1,8 +1,7 @@
 package server
 
 type Conf struct {
-	Listen     string   `json:"listen"`
-	Hostmaster string   `json:"hostmaster"`
-	Ns         []string `json:"ns"`
-	Zones      []string `json:"zones"`
+	Listen string   `json:"listen"`
+	Ns     []string `json:"ns"`
+	Ttl    uint32   `json:"ttl"`
 }

@@ -1,63 +1,104 @@
 package server
 
 import (
+	"context"
 	"github.com/1f349/azalea/database"
 	"github.com/1f349/azalea/logger"
-	"github.com/256dpi/newdns"
 	"github.com/miekg/dns"
+	"github.com/rcrowley/go-metrics"
 	"sync"
+	"time"
 )
 
 type DnsServer struct {
-	Addr  string
-	conf  Conf
-	srv   *newdns.Server
-	mu    *sync.RWMutex
-	zones map[string]*Zone
+	Addr      string
+	conf      Conf
+	mu        *sync.RWMutex
+	resolver  *Resolver
+	closeFunc func()
 }
 
-func (d *DnsServer) ZoneHandler(name string) (*newdns.Zone, error) {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-	zone := d.zones[name]
-	return zone.zone, nil
+func (d *DnsServer) Reload(ctx context.Context) error {
+	return d.resolver.Reload(ctx)
 }
 
 func (d *DnsServer) Run() {
-	go func() {
-		err := d.srv.Run(d.conf.Listen)
+	err := d.Reload(context.Background())
+	if err != nil {
+		logger.Logger.Error("Failed to reload dns server", "err", err)
+	}
+
+	tcpResponseTimer := metrics.NewTimer()
+	metrics.Register("request.handler.tcp.response_time", tcpResponseTimer)
+	tcpRequestCounter := metrics.NewCounter()
+	metrics.Register("request.handler.tcp.requests", tcpRequestCounter)
+
+	udpResponseTimer := metrics.NewTimer()
+	metrics.Register("request.handler.udp.response_time", udpResponseTimer)
+	udpRequestCounter := metrics.NewCounter()
+	metrics.Register("request.handler.udp.requests", udpRequestCounter)
+
+	tcpDnsHandler := &Handler{
+		resolver:       d.resolver,
+		requestCounter: tcpRequestCounter,
+		responseTimer:  tcpResponseTimer,
+	}
+	udpDnsHandler := &Handler{
+		resolver:       d.resolver,
+		requestCounter: udpRequestCounter,
+		responseTimer:  udpResponseTimer,
+	}
+
+	udpHandler := dns.NewServeMux()
+	tcpHandler := dns.NewServeMux()
+
+	tcpHandler.HandleFunc(".", tcpDnsHandler.Handle)
+	udpHandler.HandleFunc(".", udpDnsHandler.Handle)
+
+	tcpServer := &dns.Server{
+		Addr:         d.conf.Listen,
+		Net:          "tcp",
+		Handler:      tcpHandler,
+		ReadTimeout:  2 * time.Second,
+		WriteTimeout: 2 * time.Second,
+	}
+
+	udpServer := &dns.Server{
+		Addr:         d.conf.Listen,
+		Net:          "udp",
+		Handler:      udpHandler,
+		UDPSize:      65535,
+		ReadTimeout:  2 * time.Second,
+		WriteTimeout: 2 * time.Second,
+	}
+
+	start := func(server *dns.Server) {
+		err := server.ListenAndServe()
 		if err != nil {
 			logger.Logger.Error("Failed to start server", "err", err)
 		}
-	}()
+	}
+
+	go start(tcpServer)
+	go start(udpServer)
+
+	d.closeFunc = func() {
+		_ = tcpServer.Shutdown()
+		_ = udpServer.Shutdown()
+	}
 }
 
 func (d *DnsServer) Close() {
-	d.srv.Close()
+	if d.closeFunc != nil {
+		d.closeFunc()
+	}
 }
 
 func NewDnsServer(conf Conf, db *database.Queries) *DnsServer {
-	d := &DnsServer{
-		Addr:  conf.Listen,
-		conf:  conf,
-		mu:    new(sync.RWMutex),
-		zones: make(map[string]*Zone, len(conf.Zones)),
+	return &DnsServer{
+		Addr:     conf.Listen,
+		conf:     conf,
+		mu:       new(sync.RWMutex),
+		resolver: NewResolver(db),
 	}
-
-	for _, i := range conf.Zones {
-		d.zones[i] = NewZone(d, db, conf, i)
-	}
-
-	// create server
-	d.srv = newdns.NewServer(newdns.Config{
-		Zones:   conf.Zones,
-		Handler: d.ZoneHandler,
-		Logger: func(e newdns.Event, msg *dns.Msg, err error, reason string) {
-			if err != nil {
-				logger.Logger.Error("zone handler error", "event", e, "err", err, "reason", reason)
-			}
-		},
-	})
-
-	return d
 }
