@@ -18,6 +18,21 @@ type Record struct {
 	Value  string        `json:"value"`
 }
 
+type Service struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	Available bool   `json:"available"`
+}
+
+type ServiceRecord struct {
+	ID      int64   `json:"id"`
+	Service int64   `json:"service"`
+	Type    string  `json:"type"`
+	Value   string  `json:"value"`
+	Lat     float64 `json:"lat"`
+	Long    float64 `json:"long"`
+}
+
 type Zone struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`

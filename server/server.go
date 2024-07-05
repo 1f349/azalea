@@ -1,9 +1,9 @@
 package server
 
 import (
-	"context"
-	"github.com/1f349/azalea/database"
+	"github.com/1f349/azalea/conf"
 	"github.com/1f349/azalea/logger"
+	"github.com/1f349/azalea/resolver"
 	"github.com/miekg/dns"
 	"github.com/rcrowley/go-metrics"
 	"sync"
@@ -12,22 +12,13 @@ import (
 
 type DnsServer struct {
 	Addr      string
-	conf      Conf
+	conf      conf.Conf
 	mu        *sync.RWMutex
-	resolver  *Resolver
+	resolver  *resolver.Resolver
 	closeFunc func()
 }
 
-func (d *DnsServer) Reload(ctx context.Context) error {
-	return d.resolver.Reload(ctx)
-}
-
 func (d *DnsServer) Run() {
-	err := d.Reload(context.Background())
-	if err != nil {
-		logger.Logger.Error("Failed to reload dns server", "err", err)
-	}
-
 	tcpResponseTimer := metrics.NewTimer()
 	metrics.Register("request.handler.tcp.response_time", tcpResponseTimer)
 	tcpRequestCounter := metrics.NewCounter()
@@ -94,11 +85,11 @@ func (d *DnsServer) Close() {
 	}
 }
 
-func NewDnsServer(conf Conf, db *database.Queries) *DnsServer {
+func NewDnsServer(conf conf.Conf, res *resolver.Resolver) *DnsServer {
 	return &DnsServer{
 		Addr:     conf.Listen,
 		conf:     conf,
 		mu:       new(sync.RWMutex),
-		resolver: NewResolver(db),
+		resolver: res,
 	}
 }

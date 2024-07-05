@@ -6,7 +6,6 @@ import (
 	"github.com/miekg/dns"
 	"net"
 	"strconv"
-	"time"
 )
 
 type ErrInvalidRecord struct {
@@ -27,37 +26,6 @@ func (e ErrInvalidRecord) Unwrap() error {
 var ErrInvalidSegmentCount = errors.New("invalid segment count")
 
 var Converters = map[uint16]func(data []string, header dns.RR_Header) (dns.RR, error){
-	dns.TypeSOA: func(data []string, header dns.RR_Header) (dns.RR, error) {
-		if len(data) != 6 {
-			return nil, ErrInvalidSegmentCount
-		}
-		refresh, err := strconv.ParseUint(data[2], 10, 32)
-		if err != nil {
-			return nil, err
-		}
-		retry, err := strconv.ParseUint(data[3], 10, 32)
-		if err != nil {
-			return nil, err
-		}
-		expire, err := strconv.ParseUint(data[4], 10, 32)
-		if err != nil {
-			return nil, err
-		}
-		minttl, err := strconv.ParseUint(data[5], 10, 32)
-		if err != nil {
-			return nil, err
-		}
-		return &dns.SOA{
-			Hdr:     header,
-			Ns:      data[0],
-			Mbox:    data[1],
-			Serial:  uint32(time.Now().Truncate(time.Hour).Unix()),
-			Refresh: uint32(refresh),
-			Retry:   uint32(retry),
-			Expire:  uint32(expire),
-			Minttl:  uint32(minttl),
-		}, nil
-	},
 	dns.TypeNS: func(data []string, header dns.RR_Header) (dns.RR, error) {
 		if len(data) != 1 {
 			return nil, ErrInvalidSegmentCount

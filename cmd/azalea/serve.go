@@ -2,17 +2,23 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"github.com/1f349/azalea"
+	"github.com/1f349/azalea/conf"
 	"github.com/1f349/azalea/logger"
+	"github.com/1f349/azalea/resolver"
 	"github.com/1f349/azalea/server"
+	"github.com/1f349/azalea/server/api"
+	"github.com/1f349/mjwt"
 	"github.com/charmbracelet/log"
 	"github.com/google/subcommands"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/mrmelon54/exit-reload"
+	"gopkg.in/yaml.v3"
+	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type serveCmd struct {
@@ -56,8 +62,8 @@ func (s *serveCmd) Execute(_ context.Context, _ *flag.FlagSet, _ ...any) subcomm
 		return subcommands.ExitFailure
 	}
 
-	var config server.Conf
-	err = json.NewDecoder(openConf).Decode(&config)
+	var config conf.Conf
+	err = yaml.NewDecoder(openConf).Decode(&config)
 	if err != nil {
 		logger.Logger.Error("Invalid config file", "err", err)
 		return subcommands.ExitFailure
@@ -72,18 +78,46 @@ func (s *serveCmd) Execute(_ context.Context, _ *flag.FlagSet, _ ...any) subcomm
 	return subcommands.ExitSuccess
 }
 
-func normalLoad(startUp server.Conf, wd string) {
+func normalLoad(startUp conf.Conf, wd string) {
+	// load the MJWT RSA public key from a pem encoded file
+	mJwtVerify, err := mjwt.NewMJwtVerifierFromFile(filepath.Join(wd, "signer.public.pem"))
+	if err != nil {
+		logger.Logger.Fatal("Failed to load MJWT verifier public key", "file", filepath.Join(wd, "signer.public.pem"), "err", err)
+	}
+
 	db, err := azalea.InitDB(filepath.Join(wd, "azalea.db.sqlite"))
 	if err != nil {
 		logger.Logger.Fatal("Failed to open database", "err", err)
 	}
 
-	srv := server.NewDnsServer(startUp, db)
-	logger.Logger.Info("Starting server", "addr", srv.Addr)
-	srv.Run()
+	res := resolver.NewResolver(startUp.Soa, db)
+
+	dnsSrv := server.NewDnsServer(startUp, res)
+	logger.Logger.Info("Starting server", "addr", dnsSrv.Addr)
+	dnsSrv.Run()
+
+	if startUp.Master {
+		apiMux := api.NewApiServer(db, res, mJwtVerify)
+		apiSrv := &http.Server{
+			Addr:              startUp.ApiListen,
+			Handler:           apiMux,
+			ReadTimeout:       time.Minute,
+			ReadHeaderTimeout: time.Minute,
+			WriteTimeout:      time.Minute,
+			IdleTimeout:       time.Minute,
+			MaxHeaderBytes:    2500,
+		}
+		logger.Logger.Info("Starting API server", "addr", apiSrv.Addr)
+		go func() {
+			err := apiSrv.ListenAndServe()
+			if err != nil {
+				logger.Logger.Error("Failed to start API server", "err", err)
+			}
+		}()
+	}
 
 	exit_reload.ExitReload("Azalea", func() {}, func() {
-		// stop http server
-		srv.Close()
+		// stop dns server
+		dnsSrv.Close()
 	})
 }
