@@ -14,6 +14,7 @@ import (
 	"github.com/google/subcommands"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/mrmelon54/exit-reload"
+	"github.com/oschwald/geoip2-golang"
 	"gopkg.in/yaml.v3"
 	"net/http"
 	"os"
@@ -90,7 +91,12 @@ func normalLoad(startUp conf.Conf, wd string) {
 		logger.Logger.Fatal("Failed to open database", "err", err)
 	}
 
-	res := resolver.NewResolver(startUp.Soa, db)
+	openGeo, err := geoip2.Open(filepath.Join(wd, startUp.GeoIP))
+	if err != nil {
+		logger.Logger.Fatal("Failed to open GeoIP DB", "err", err)
+	}
+
+	res := resolver.NewResolver(startUp.Soa, db, resolver.NewGeoResolver(openGeo, db))
 
 	dnsSrv := server.NewDnsServer(startUp, res)
 	logger.Logger.Info("Starting server", "addr", dnsSrv.Addr)

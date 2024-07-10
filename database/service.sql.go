@@ -73,11 +73,20 @@ func (q *Queries) GetAllServices(ctx context.Context) ([]Service, error) {
 }
 
 const getBestLocationResolvedRecord = `-- name: GetBestLocationResolvedRecord :one
-SELECT service_records.id, service_records.service, service_records.type, service_records.value, service_records.lat, service_records.long, SQRT(POWER(? - service_records.lat, 2) + POWER(? - service_records.long, 2)) AS distance
-FROM service_records
-         INNER JOIN services s ON s.id = service_records.service
-WHERE s.name = ?
-  AND s.available
+WITH distances as (SELECT service_records.id, service_records.service, service_records.type, service_records.value, service_records.lat, service_records.long,
+                          cast(? - service_records.lat as float)  as lat_diff,
+                          cast(? - service_records.long as float) as long_diff
+                   FROM service_records
+                            INNER JOIN services s ON s.id = service_records.service
+                   WHERE s.name = ?
+                     AND s.available = 1),
+     distances2 as (SELECT distances.id, distances.service, distances.type, distances.value, distances.lat, distances.long, distances.lat_diff, distances.long_diff,
+                           cast((lat_diff * lat_diff + long_diff * long_diff) as float)                 AS d1,
+                           cast((lat_diff * lat_diff + (long_diff + 360) * (long_diff + 360)) as float) AS d2,
+                           cast((lat_diff * lat_diff + (long_diff - 360) * (long_diff - 360)) as float) AS d3
+                    FROM distances)
+SELECT distances2.id, distances2.service, distances2.type, distances2.value, distances2.lat, distances2.long, distances2.lat_diff, distances2.long_diff, distances2.d1, distances2.d2, distances2.d3, cast(min(d1, d2, d3) as float) as distance
+FROM distances2
 ORDER BY distance
 LIMIT 1
 `
@@ -95,6 +104,11 @@ type GetBestLocationResolvedRecordRow struct {
 	Value    string  `json:"value"`
 	Lat      float64 `json:"lat"`
 	Long     float64 `json:"long"`
+	LatDiff  float64 `json:"lat_diff"`
+	LongDiff float64 `json:"long_diff"`
+	D1       float64 `json:"d1"`
+	D2       float64 `json:"d2"`
+	D3       float64 `json:"d3"`
 	Distance float64 `json:"distance"`
 }
 
@@ -108,6 +122,11 @@ func (q *Queries) GetBestLocationResolvedRecord(ctx context.Context, arg GetBest
 		&i.Value,
 		&i.Lat,
 		&i.Long,
+		&i.LatDiff,
+		&i.LongDiff,
+		&i.D1,
+		&i.D2,
+		&i.D3,
 		&i.Distance,
 	)
 	return i, err

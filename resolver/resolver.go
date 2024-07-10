@@ -13,6 +13,7 @@ import (
 	"golang.org/x/net/publicsuffix"
 	"math/rand/v2"
 	"net"
+	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -23,14 +24,16 @@ type Resolver struct {
 	db      *database.Queries
 	zoneMu  *sync.RWMutex
 	zoneMap map[int64]string
+	geo     *GeoResolver
 }
 
-func NewResolver(soa conf.SoaConf, db *database.Queries) *Resolver {
+func NewResolver(soa conf.SoaConf, db *database.Queries, geo *GeoResolver) *Resolver {
 	return &Resolver{
 		soa:     soa,
 		db:      db,
 		zoneMu:  new(sync.RWMutex),
 		zoneMap: make(map[int64]string),
+		geo:     geo,
 	}
 }
 
@@ -39,7 +42,7 @@ func (r *Resolver) Authority(ctx context.Context, domain string) (soa *dns.SOA) 
 	for i, _ := range tree {
 		subdomain := strings.Join(tree[i:], ".")
 
-		answers, err := r.LookupAnswersForType(ctx, subdomain, dns.TypeSOA)
+		answers, err := r.LookupAnswersForType(ctx, subdomain, dns.TypeSOA, nil)
 		if err != nil {
 			return
 		}
@@ -55,7 +58,7 @@ func (r *Resolver) Authority(ctx context.Context, domain string) (soa *dns.SOA) 
 	return
 }
 
-func (r *Resolver) Lookup(ctx context.Context, req *dns.Msg) (msg *dns.Msg) {
+func (r *Resolver) Lookup(ctx context.Context, req *dns.Msg, addr net.Addr) (msg *dns.Msg) {
 	q := req.Question[0]
 
 	msg = new(dns.Msg)
@@ -71,7 +74,7 @@ func (r *Resolver) Lookup(ctx context.Context, req *dns.Msg) (msg *dns.Msg) {
 	var eChan chan error
 
 	if q.Qclass == dns.ClassINET {
-		aChan, eChan = r.AnswerQuestion(ctx, q)
+		aChan, eChan = r.AnswerQuestion(ctx, q, addr)
 		answers, errors = gatherFromChannels(aChan, eChan)
 	}
 
@@ -88,7 +91,7 @@ func (r *Resolver) Lookup(ctx context.Context, req *dns.Msg) (msg *dns.Msg) {
 					Qtype:  q.Qtype,
 					Qclass: q.Qclass}
 
-				aChan, eChan = r.AnswerQuestion(ctx, question)
+				aChan, eChan = r.AnswerQuestion(ctx, question, addr)
 				answers, errors = gatherFromChannels(aChan, eChan)
 
 				errored = errored || len(errors) > 0
@@ -156,7 +159,7 @@ func gatherFromChannels(rrsIn chan dns.RR, errsIn chan error) (rrs []dns.RR, err
 // the way. The function will return immediately, and spawn off a bunch of goroutines
 // to do the work, when using this function one should use a WaitGroup to know when all work
 // has been completed.
-func (r *Resolver) AnswerQuestion(ctx context.Context, q dns.Question) (answers chan dns.RR, errors chan error) {
+func (r *Resolver) AnswerQuestion(ctx context.Context, q dns.Question, addr net.Addr) (answers chan dns.RR, errors chan error) {
 	answers = make(chan dns.RR)
 	errors = make(chan error)
 
@@ -172,7 +175,7 @@ func (r *Resolver) AnswerQuestion(ctx context.Context, q dns.Question) (answers 
 				close(answers)
 				close(errors)
 			}()
-			records, err := r.LookupAnswersForType(ctx, q.Name, q.Qtype)
+			records, err := r.LookupAnswersForType(ctx, q.Name, q.Qtype, addr)
 			if err != nil {
 				errors <- err
 			} else {
@@ -181,7 +184,7 @@ func (r *Resolver) AnswerQuestion(ctx context.Context, q dns.Question) (answers 
 						answers <- rr
 					}
 				} else {
-					cnames, err := r.LookupAnswersForType(ctx, q.Name, dns.TypeCNAME)
+					cnames, err := r.LookupAnswersForType(ctx, q.Name, dns.TypeCNAME, nil)
 					if err != nil {
 						errors <- err
 					} else {
@@ -203,7 +206,7 @@ func (r *Resolver) AnswerQuestion(ctx context.Context, q dns.Question) (answers 
 	return answers, errors
 }
 
-func (r *Resolver) LookupAnswersForType(ctx context.Context, name string, rrType uint16) (answers []dns.RR, err error) {
+func (r *Resolver) LookupAnswersForType(ctx context.Context, name string, rrType uint16, addr net.Addr) (answers []dns.RR, err error) {
 	name = strings.ToLower(name)
 
 	switch rrType {
@@ -238,26 +241,18 @@ func (r *Resolver) LookupAnswersForType(ctx context.Context, name string, rrType
 	rrs := make([]dns.RR, 0, len(records))
 	for _, record := range records {
 		if record.IsLocationResolving() {
-			// TODO(melon): add location based resolving code
-			name := utils.ResolveRecordName(record.Name, record.ZoneName)
-			rrs = append(rrs, &dns.A{
-				Hdr: dns.RR_Header{
-					Name:   name,
-					Rrtype: dns.TypeA,
-					Class:  dns.ClassINET,
-					Ttl:    r.soa.Ttl,
-				},
-				A: net.IPv4(10, 32, 0, 1),
-			})
-			rrs = append(rrs, &dns.AAAA{
-				Hdr: dns.RR_Header{
-					Name:   name,
-					Rrtype: dns.TypeAAAA,
-					Class:  dns.ClassINET,
-					Ttl:    r.soa.Ttl,
-				},
-				AAAA: net.IP{134, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 34},
-			})
+			if addr != nil {
+				// TODO(melon): add tests for this code
+				addrPort, err := netip.ParseAddrPort(addr.String())
+				if err != nil {
+					return nil, err
+				}
+				resolvedRecords, err := r.geo.GeoResolvedRecords(ctx, record.Value, addrPort.Addr().AsSlice())
+				if err != nil {
+					return nil, err
+				}
+				rrs = append(rrs, resolvedRecords...)
+			}
 			continue
 		}
 		rr, err := record.RR(r.soa.Ttl)

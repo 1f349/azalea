@@ -25,7 +25,7 @@ func (h *Handler) Handle(response dns.ResponseWriter, req *dns.Msg) {
 		}
 
 		var msg *dns.Msg
-		msg = h.resolver.Lookup(context.Background(), req)
+		msg = h.resolver.Lookup(context.Background(), req, response.RemoteAddr())
 		if msg != nil {
 			err := response.WriteMsg(msg)
 			if err != nil {

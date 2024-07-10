@@ -4,6 +4,7 @@ type Conf struct {
 	Listen    string  `yaml:"listen"`
 	ApiListen string  `yaml:"apiListen"`
 	Master    bool    `yaml:"master"`
+	GeoIP     string  `yaml:"geoip"`
 	Soa       SoaConf `yaml:"soa"`
 }
 
