@@ -231,18 +231,17 @@ func (r *Resolver) LookupAnswersForType(ctx context.Context, name string, rrType
 	}
 	shortName := utils.SimplifyRecordName(name, dns.Fqdn(rootZone))
 
-	// TODO: add location based resolving
-
 	records, err := r.db.LookupRecordsForType(ctx, database.LookupRecordsForTypeParams{Type: dns.TypeToString[rrType], Name: shortName, Name_2: dns.Fqdn(rootZone)})
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(records)
+
+	// convert records to dns.RR and process location resolving records
 	rrs := make([]dns.RR, 0, len(records))
 	for _, record := range records {
 		if record.IsLocationResolving() {
 			if addr != nil {
-				// TODO(melon): add tests for this code
+				// parse the ip address and resolve
 				addrPort, err := netip.ParseAddrPort(addr.String())
 				if err != nil {
 					return nil, err
@@ -255,6 +254,7 @@ func (r *Resolver) LookupAnswersForType(ctx context.Context, name string, rrType
 			}
 			continue
 		}
+		// convert to an RR record
 		rr, err := record.RR(r.soa.Ttl)
 		if err != nil {
 			return nil, err
@@ -339,8 +339,8 @@ func (r *Resolver) getSoaRecord(zone string) *dns.SOA {
 			Class:  dns.ClassINET,
 			Ttl:    r.soa.Ttl,
 		},
-		Ns:      r.soa.Ns[0],
-		Mbox:    r.soa.Mbox,
+		Ns:      dns.Fqdn(r.soa.Ns[0]),
+		Mbox:    dns.Fqdn(r.soa.Mbox),
 		Serial:  n2,
 		Refresh: r.soa.Refresh,
 		Retry:   r.soa.Retry,
@@ -359,7 +359,7 @@ func (r *Resolver) getNsRecords(zone string) []dns.RR {
 				Class:  dns.ClassINET,
 				Ttl:    r.soa.Ttl,
 			},
-			Ns: ns,
+			Ns: dns.Fqdn(ns),
 		})
 	}
 	return rrs

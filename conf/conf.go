@@ -3,6 +3,7 @@ package conf
 type Conf struct {
 	Listen    string  `yaml:"listen"`
 	ApiListen string  `yaml:"apiListen"`
+	DB        string  `yaml:"db"`
 	Master    bool    `yaml:"master"`
 	GeoIP     string  `yaml:"geoip"`
 	Soa       SoaConf `yaml:"soa"`

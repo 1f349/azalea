@@ -10,7 +10,6 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.17.1
 	github.com/google/subcommands v1.2.0
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/miekg/dns v1.1.59
 	github.com/mrmelon54/exit-reload v0.0.2
 	github.com/oschwald/geoip2-golang v1.11.0
@@ -28,6 +27,7 @@ require (
 	github.com/charmbracelet/x/ansi v0.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
+	github.com/go-sql-driver/mysql v1.5.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect

@@ -12,7 +12,6 @@ import (
 	"github.com/1f349/mjwt"
 	"github.com/charmbracelet/log"
 	"github.com/google/subcommands"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/mrmelon54/exit-reload"
 	"github.com/oschwald/geoip2-golang"
 	"gopkg.in/yaml.v3"
@@ -86,7 +85,7 @@ func normalLoad(startUp conf.Conf, wd string) {
 		logger.Logger.Fatal("Failed to load MJWT verifier public key", "file", filepath.Join(wd, "signer.public.pem"), "err", err)
 	}
 
-	db, err := azalea.InitDB(filepath.Join(wd, "azalea.db.sqlite"))
+	db, err := azalea.InitDB(startUp.DB)
 	if err != nil {
 		logger.Logger.Fatal("Failed to open database", "err", err)
 	}
