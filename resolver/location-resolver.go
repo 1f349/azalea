@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"context"
+	"errors"
 	"github.com/1f349/azalea/database"
 	"github.com/1f349/azalea/logger"
 	"github.com/miekg/dns"
@@ -26,6 +27,9 @@ func NewGeoResolver(geo *geoip2.Reader, db *database.Queries) *GeoResolver {
 }
 
 func (l *GeoResolver) GetLatLong(ip net.IP) (LatLong, error) {
+	if l.geo == nil {
+		return LatLong{}, errors.New("geoip is not enabled")
+	}
 	city, err := l.geo.City(ip)
 	if err != nil {
 		return LatLong{}, err

@@ -90,12 +90,17 @@ func normalLoad(startUp conf.Conf, wd string) {
 		logger.Logger.Fatal("Failed to open database", "err", err)
 	}
 
-	openGeo, err := geoip2.Open(filepath.Join(wd, startUp.GeoIP))
-	if err != nil {
-		logger.Logger.Fatal("Failed to open GeoIP DB", "err", err)
+	var openGeo *geoip2.Reader
+	if startUp.GeoIP != "" {
+		logger.Logger.Info("Loading GeoIP database", "db", startUp.GeoIP)
+		openGeo, err = geoip2.Open(filepath.Join(wd, startUp.GeoIP))
+		if err != nil {
+			logger.Logger.Fatal("Failed to open GeoIP DB", "err", err)
+		}
 	}
 
-	res := resolver.NewResolver(startUp.Soa, db, resolver.NewGeoResolver(openGeo, db))
+	geoRes := resolver.NewGeoResolver(openGeo, db)
+	res := resolver.NewResolver(startUp.Soa, db, geoRes)
 
 	dnsSrv := server.NewDnsServer(startUp, res)
 	logger.Logger.Info("Starting server", "addr", dnsSrv.Addr)
