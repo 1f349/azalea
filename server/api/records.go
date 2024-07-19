@@ -86,7 +86,7 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 		}
 		records, err := res.GetZoneRecords(req.Context(), domain)
 		if errors.Is(err, sql.ErrNoRows) {
-			http.Error(rw, "Invalid domain", http.StatusNotFound)
+			apiError(rw, http.StatusInternalServerError, "Zone records not found")
 			return
 		}
 		if err != nil {
