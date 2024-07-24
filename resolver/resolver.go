@@ -163,9 +163,11 @@ func (r *Resolver) AnswerQuestion(ctx context.Context, q dns.Question, addr net.
 	answers = make(chan dns.RR)
 	errors = make(chan error)
 
-	typeStr := strings.ToLower(dns.TypeToString[q.Qtype])
+	typeStr := dns.TypeToString[q.Qtype]
 	typeCounter := metrics.GetOrRegisterCounter("resolver.answers.type."+typeStr, metrics.DefaultRegistry)
 	typeCounter.Inc(1)
+	questionCounter := metrics.GetOrRegisterCounter("resolver.answers.question."+typeStr+"."+q.Name, metrics.DefaultRegistry)
+	questionCounter.Inc(1)
 
 	logger.Logger.Debug("Answering question ", "q", q)
 

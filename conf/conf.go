@@ -1,12 +1,13 @@
 package conf
 
 type Conf struct {
-	Listen    string  `yaml:"listen"`
-	ApiListen string  `yaml:"apiListen"`
-	DB        string  `yaml:"db"`
-	Master    bool    `yaml:"master"`
-	GeoIP     string  `yaml:"geoip"`
-	Soa       SoaConf `yaml:"soa"`
+	Listen      string  `yaml:"listen"`
+	ApiListen   string  `yaml:"apiListen"`
+	DB          string  `yaml:"db"`
+	Master      bool    `yaml:"master"`
+	GeoIP       string  `yaml:"geoip"`
+	MetricsAuth string  `yaml:"metricsAuth"`
+	Soa         SoaConf `yaml:"soa"`
 }
 
 type SoaConf struct {

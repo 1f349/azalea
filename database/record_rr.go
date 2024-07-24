@@ -17,7 +17,7 @@ func (r Record) RR(zone string, defaultTtl uint32) (dns.RR, error) {
 		Ttl:    defaultTtl,
 	}
 	if r.Ttl.Valid {
-		header.Ttl = uint32(r.Ttl.Int64)
+		header.Ttl = uint32(r.Ttl.Int32)
 	}
 	if header.Rrtype == dns.TypeNone {
 		return nil, converters.ErrInvalidRecord{Name: name, Value: r.Value, AType: r.Type, Reason: fmt.Errorf("invalid type %s", r.Type)}

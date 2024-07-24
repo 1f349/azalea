@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"github.com/1f349/azalea/database"
 	"github.com/1f349/azalea/resolver"
@@ -14,13 +15,25 @@ import (
 	"strings"
 )
 
-func NewApiServer(db *database.Queries, res *resolver.Resolver, verify mjwt.Verifier) *httprouter.Router {
+func NewApiServer(db *database.Queries, res *resolver.Resolver, verify mjwt.Verifier, authToken string) *httprouter.Router {
 	r := httprouter.New()
 
 	r.GET("/", func(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
 		http.Error(rw, "Azalea API Endpoint", http.StatusOK)
 	})
 	r.GET("/metrics", func(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
+		auth := req.Header.Get("Authorization")
+		if auth == "" {
+			if strings.HasPrefix(authToken, "Basic ") {
+				rw.Header().Set("WWW-Authenticate", `Basic realm="metrics"`)
+			}
+			http.Error(rw, "Invalid authorization", http.StatusUnauthorized)
+			return
+		}
+		if subtle.ConstantTimeCompare([]byte(auth), []byte(authToken)) != 1 {
+			http.Error(rw, "Forbidden", http.StatusForbidden)
+			return
+		}
 		_ = json.NewEncoder(rw).Encode(metrics.DefaultRegistry.GetAll())
 	})
 

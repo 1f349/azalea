@@ -16,7 +16,7 @@ VALUES (?, ?, ?, ?, ?)
 `
 
 type AddZoneRecordParams struct {
-	Zone   int64  `json:"zone"`
+	Zone   int32  `json:"zone"`
 	Name   string `json:"name"`
 	Type   string `json:"type"`
 	Locked bool   `json:"locked"`
@@ -45,8 +45,8 @@ WHERE zone = ?
 `
 
 type DeleteZoneRecordByIdParams struct {
-	Zone int64 `json:"zone"`
-	ID   int64 `json:"id"`
+	Zone int32 `json:"zone"`
+	ID   int32 `json:"id"`
 }
 
 func (q *Queries) DeleteZoneRecordById(ctx context.Context, arg DeleteZoneRecordByIdParams) error {
@@ -62,8 +62,8 @@ WHERE zone = ?
 `
 
 type GetZoneRecordByIdParams struct {
-	Zone int64 `json:"zone"`
-	ID   int64 `json:"id"`
+	Zone int32 `json:"zone"`
+	ID   int32 `json:"id"`
 }
 
 func (q *Queries) GetZoneRecordById(ctx context.Context, arg GetZoneRecordByIdParams) (Record, error) {
@@ -135,12 +135,12 @@ type LookupRecordsForTypeParams struct {
 }
 
 type LookupRecordsForTypeRow struct {
-	ID       int64         `json:"id"`
-	Zone     int64         `json:"zone"`
+	ID       int32         `json:"id"`
+	Zone     int32         `json:"zone"`
 	Name     string        `json:"name"`
 	Type     string        `json:"type"`
 	Locked   bool          `json:"locked"`
-	Ttl      sql.NullInt64 `json:"ttl"`
+	Ttl      sql.NullInt32 `json:"ttl"`
 	Value    string        `json:"value"`
 	ZoneName string        `json:"zone_name"`
 }
@@ -186,8 +186,8 @@ WHERE zone = ?
 
 type PutZoneRecordByIdParams struct {
 	Value string `json:"value"`
-	Zone  int64  `json:"zone"`
-	ID    int64  `json:"id"`
+	Zone  int32  `json:"zone"`
+	ID    int32  `json:"id"`
 }
 
 func (q *Queries) PutZoneRecordById(ctx context.Context, arg PutZoneRecordByIdParams) error {

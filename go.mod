@@ -6,6 +6,7 @@ require (
 	github.com/1f349/mjwt v0.3.1
 	github.com/1f349/violet v0.0.14
 	github.com/charmbracelet/log v0.4.0
+	github.com/chmike/domain v1.0.1
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/golang-migrate/migrate/v4 v4.17.1
 	github.com/google/subcommands v1.2.0

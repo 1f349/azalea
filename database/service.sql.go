@@ -10,7 +10,7 @@ import (
 )
 
 const getAllServiceRecords = `-- name: GetAllServiceRecords :many
-SELECT id, service, type, value, lat, long
+SELECT id, service, type, value, latitude, longitude
 FROM service_records
 `
 
@@ -28,8 +28,8 @@ func (q *Queries) GetAllServiceRecords(ctx context.Context) ([]ServiceRecord, er
 			&i.Service,
 			&i.Type,
 			&i.Value,
-			&i.Lat,
-			&i.Long,
+			&i.Latitude,
+			&i.Longitude,
 		); err != nil {
 			return nil, err
 		}
@@ -73,55 +73,55 @@ func (q *Queries) GetAllServices(ctx context.Context) ([]Service, error) {
 }
 
 const getBestLocationResolvedRecord = `-- name: GetBestLocationResolvedRecord :one
-WITH distances as (SELECT service_records.id, service_records.service, service_records.type, service_records.value, service_records.lat, service_records.long,
-                          cast(? - service_records.lat as float)  as lat_diff,
-                          cast(? - service_records.long as float) as long_diff
+WITH distances as (SELECT service_records.id, service_records.service, service_records.type, service_records.value, service_records.latitude, service_records.longitude,
+                          cast(cast(? as float) - service_records.latitude as float)  as lat_diff,
+                          cast(cast(? as float) - service_records.longitude as float) as long_diff
                    FROM service_records
                             INNER JOIN services s ON s.id = service_records.service
                    WHERE s.name = ?
                      AND s.available = 1),
-     distances2 as (SELECT distances.id, distances.service, distances.type, distances.value, distances.lat, distances.long, distances.lat_diff, distances.long_diff,
+     distances2 as (SELECT distances.id, distances.service, distances.type, distances.value, distances.latitude, distances.longitude, distances.lat_diff, distances.long_diff,
                            cast((lat_diff * lat_diff + long_diff * long_diff) as float)                 AS d1,
                            cast((lat_diff * lat_diff + (long_diff + 360) * (long_diff + 360)) as float) AS d2,
                            cast((lat_diff * lat_diff + (long_diff - 360) * (long_diff - 360)) as float) AS d3
                     FROM distances)
-SELECT distances2.id, distances2.service, distances2.type, distances2.value, distances2.lat, distances2.long, distances2.lat_diff, distances2.long_diff, distances2.d1, distances2.d2, distances2.d3, cast(min(d1, d2, d3) as float) as distance
+SELECT distances2.id, distances2.service, distances2.type, distances2.value, distances2.latitude, distances2.longitude, distances2.lat_diff, distances2.long_diff, distances2.d1, distances2.d2, distances2.d3, cast(least(d1, d2, d3) as float) as distance
 FROM distances2
 ORDER BY distance
 LIMIT 1
 `
 
 type GetBestLocationResolvedRecordParams struct {
-	Lat  float64 `json:"lat"`
-	Long float64 `json:"long"`
-	Name string  `json:"name"`
+	Column1 float64 `json:"column_1"`
+	Column2 float64 `json:"column_2"`
+	Name    string  `json:"name"`
 }
 
 type GetBestLocationResolvedRecordRow struct {
-	ID       int64   `json:"id"`
-	Service  int64   `json:"service"`
-	Type     string  `json:"type"`
-	Value    string  `json:"value"`
-	Lat      float64 `json:"lat"`
-	Long     float64 `json:"long"`
-	LatDiff  float64 `json:"lat_diff"`
-	LongDiff float64 `json:"long_diff"`
-	D1       float64 `json:"d1"`
-	D2       float64 `json:"d2"`
-	D3       float64 `json:"d3"`
-	Distance float64 `json:"distance"`
+	ID        int32   `json:"id"`
+	Service   int32   `json:"service"`
+	Type      string  `json:"type"`
+	Value     string  `json:"value"`
+	Latitude  string  `json:"latitude"`
+	Longitude string  `json:"longitude"`
+	LatDiff   float64 `json:"lat_diff"`
+	LongDiff  float64 `json:"long_diff"`
+	D1        float64 `json:"d1"`
+	D2        float64 `json:"d2"`
+	D3        float64 `json:"d3"`
+	Distance  float64 `json:"distance"`
 }
 
 func (q *Queries) GetBestLocationResolvedRecord(ctx context.Context, arg GetBestLocationResolvedRecordParams) (GetBestLocationResolvedRecordRow, error) {
-	row := q.db.QueryRowContext(ctx, getBestLocationResolvedRecord, arg.Lat, arg.Long, arg.Name)
+	row := q.db.QueryRowContext(ctx, getBestLocationResolvedRecord, arg.Column1, arg.Column2, arg.Name)
 	var i GetBestLocationResolvedRecordRow
 	err := row.Scan(
 		&i.ID,
 		&i.Service,
 		&i.Type,
 		&i.Value,
-		&i.Lat,
-		&i.Long,
+		&i.Latitude,
+		&i.Longitude,
 		&i.LatDiff,
 		&i.LongDiff,
 		&i.D1,

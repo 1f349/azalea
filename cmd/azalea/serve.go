@@ -107,7 +107,7 @@ func normalLoad(startUp conf.Conf, wd string) {
 	dnsSrv.Run()
 
 	if startUp.Master {
-		apiMux := api.NewApiServer(db, res, mJwtVerify)
+		apiMux := api.NewApiServer(db, res, mJwtVerify, startUp.MetricsAuth)
 		apiSrv := &http.Server{
 			Addr:              startUp.ApiListen,
 			Handler:           apiMux,

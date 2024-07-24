@@ -7,6 +7,7 @@ import (
 	"errors"
 	"github.com/1f349/azalea/database"
 	"github.com/1f349/mjwt"
+	validateDomain "github.com/chmike/domain"
 	"github.com/julienschmidt/httprouter"
 	"github.com/miekg/dns"
 	"net/http"
@@ -27,8 +28,7 @@ type recordResolver interface {
 }
 
 type recordValue struct {
-	Name  string          `json:"name"`
-	Type  string          `json:"type"`
+	Hdr   *dns.RR_Header
 	Value json.RawMessage `json:"value"`
 }
 
@@ -50,6 +50,18 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 			apiError(rw, http.StatusBadRequest, "Invalid JSON")
 			return
 		}
+
+		err = validateDomain.Check(a.Hdr.Name)
+		if err != nil {
+			apiError(rw, http.StatusBadRequest, "Invalid record name")
+			return
+		}
+
+		if _, validType := dns.TypeToString[a.Hdr.Rrtype]; !validType {
+			apiError(rw, http.StatusBadRequest, "Invalid record type")
+			return
+		}
+
 		value, done := parseRecordValue(rw, a)
 		if done {
 			return
@@ -62,8 +74,8 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 		}
 		recordId, err := db.AddZoneRecord(req.Context(), database.AddZoneRecordParams{
 			Zone:   zone.ID,
-			Name:   a.Name,
-			Type:   a.Type,
+			Name:   a.Hdr.Name,
+			Type:   dns.TypeToString[a.Hdr.Rrtype],
 			Locked: false,
 			Value:  value,
 		})
@@ -116,7 +128,7 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 		}
 		zoneRecord, err := db.GetZoneRecordById(req.Context(), database.GetZoneRecordByIdParams{
 			Zone: zone.ID,
-			ID:   recordId,
+			ID:   int32(recordId),
 		})
 		if err != nil {
 			apiError(rw, http.StatusInternalServerError, "Internal database error")
@@ -161,7 +173,7 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 		}
 		zoneRecord, err := db.GetZoneRecordById(req.Context(), database.GetZoneRecordByIdParams{
 			Zone: zone.ID,
-			ID:   recordId,
+			ID:   int32(recordId),
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -188,7 +200,7 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 		err = db.PutZoneRecordById(req.Context(), database.PutZoneRecordByIdParams{
 			Value: value,
 			Zone:  zone.ID,
-			ID:    recordId,
+			ID:    int32(recordId),
 		})
 		if err != nil {
 			apiError(rw, http.StatusInternalServerError, "Internal database error")
@@ -218,7 +230,7 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 
 		zoneRecord, err := db.GetZoneRecordById(req.Context(), database.GetZoneRecordByIdParams{
 			Zone: zone.ID,
-			ID:   recordId,
+			ID:   int32(recordId),
 		})
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -235,7 +247,7 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 
 		err = db.DeleteZoneRecordById(req.Context(), database.DeleteZoneRecordByIdParams{
 			Zone: zone.ID,
-			ID:   recordId,
+			ID:   int32(recordId),
 		})
 		if err != nil {
 			apiError(rw, http.StatusInternalServerError, "Internal database error")

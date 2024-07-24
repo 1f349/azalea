@@ -46,9 +46,9 @@ func (l *GeoResolver) GetBestLocation(ctx context.Context, name string, remoteIp
 		return database.GetBestLocationResolvedRecordRow{}, err
 	}
 	return l.db.GetBestLocationResolvedRecord(ctx, database.GetBestLocationResolvedRecordParams{
-		Lat:  loc.Lat,
-		Long: loc.Long,
-		Name: name,
+		Column1: loc.Lat,
+		Column2: loc.Long,
+		Name:    name,
 	})
 }
 

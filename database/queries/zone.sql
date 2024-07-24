@@ -10,7 +10,7 @@ WHERE name = ?;
 -- name: GetOwnedZones :many
 SELECT *
 FROM zones
-WHERE name IN sqlc.slice(name);
+WHERE name IN(sqlc.slice(name));
 
 -- name: AddZone :execlastid
 INSERT INTO zones (name)

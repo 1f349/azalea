@@ -9,31 +9,31 @@ import (
 )
 
 type Record struct {
-	ID     int64         `json:"id"`
-	Zone   int64         `json:"zone"`
+	ID     int32         `json:"id"`
+	Zone   int32         `json:"zone"`
 	Name   string        `json:"name"`
 	Type   string        `json:"type"`
 	Locked bool          `json:"locked"`
-	Ttl    sql.NullInt64 `json:"ttl"`
+	Ttl    sql.NullInt32 `json:"ttl"`
 	Value  string        `json:"value"`
 }
 
 type Service struct {
-	ID        int64  `json:"id"`
+	ID        int32  `json:"id"`
 	Name      string `json:"name"`
 	Available bool   `json:"available"`
 }
 
 type ServiceRecord struct {
-	ID      int64   `json:"id"`
-	Service int64   `json:"service"`
-	Type    string  `json:"type"`
-	Value   string  `json:"value"`
-	Lat     float64 `json:"lat"`
-	Long    float64 `json:"long"`
+	ID        int32  `json:"id"`
+	Service   int32  `json:"service"`
+	Type      string `json:"type"`
+	Value     string `json:"value"`
+	Latitude  string `json:"latitude"`
+	Longitude string `json:"longitude"`
 }
 
 type Zone struct {
-	ID   int64  `json:"id"`
+	ID   int32  `json:"id"`
 	Name string `json:"name"`
 }

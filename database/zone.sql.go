@@ -26,7 +26,7 @@ func (q *Queries) AddZone(ctx context.Context, name string) (int64, error) {
 const getOwnedZones = `-- name: GetOwnedZones :many
 SELECT id, name
 FROM zones
-WHERE name IN /*SLICE:name*/?
+WHERE name IN(/*SLICE:name*/?)
 `
 
 func (q *Queries) GetOwnedZones(ctx context.Context, name []string) ([]Zone, error) {
