@@ -96,7 +96,7 @@ func TestAddRecordEndpoints(t *testing.T) {
 		req = makeReq("{")
 		req.Header.Set("Authorization", "Bearer "+makeToken())
 		doTestRequest(t, "invalid json", req, r, http.StatusBadRequest, "Invalid JSON")
-		req = makeReq(`{"name":"ns1","type":"A","value":"10.23.41.5"}`)
+		req = makeReq(`{"Hdr":{"Name":"ns1","Rrtype":1},"value":"10.23.41.5"}`)
 		req.Header.Set("Authorization", "Bearer "+makeToken())
 		doTestRequest(t, "ok", req, r, http.StatusCreated, `{"id":5}`)
 	})

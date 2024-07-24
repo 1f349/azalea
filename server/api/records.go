@@ -189,8 +189,11 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 		}
 
 		value, done := parseRecordValue(rw, recordValue{
-			Name:  zoneRecord.Name,
-			Type:  zoneRecord.Type,
+			Hdr: &dns.RR_Header{
+				Name:   zoneRecord.Name,
+				Rrtype: dns.StringToType[zoneRecord.Type],
+				Class:  dns.ClassINET,
+			},
 			Value: a.Value,
 		})
 		if done {
@@ -260,12 +263,12 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 
 func parseRecordValue(rw http.ResponseWriter, a recordValue) (string, bool) {
 	var value string
-	switch a.Type {
-	case "MX":
+	switch a.Hdr.Rrtype {
+	case dns.TypeMX:
 		// TODO(melon): implement this
 		apiError(rw, http.StatusNotImplemented, "Not Implemented")
 		return "", true
-	case "A", "AAAA":
+	case dns.TypeA, dns.TypeAAAA:
 		var ip netip.Addr
 		err := json.Unmarshal(a.Value, &ip)
 		if err != nil {
@@ -277,10 +280,10 @@ func parseRecordValue(rw http.ResponseWriter, a recordValue) (string, bool) {
 			return "", true
 		}
 		// check if parsed address is valid for this record type
-		if (a.Type == "A" && ip.Is4()) || (a.Type == "AAAA" && ip.Is6()) {
+		if (a.Hdr.Rrtype == dns.TypeA && ip.Is4()) || (a.Hdr.Rrtype == dns.TypeAAAA && ip.Is6()) {
 			value = ip.String()
 		}
-	case "CNAME":
+	case dns.TypeCNAME:
 		err := json.Unmarshal(a.Value, &value)
 		if err != nil {
 			apiError(rw, http.StatusBadRequest, "Invalid CNAME value")
@@ -291,17 +294,17 @@ func parseRecordValue(rw http.ResponseWriter, a recordValue) (string, bool) {
 			return "", true
 		}
 		value = dns.Fqdn(value)
-	case "TXT":
+	case dns.TypeTXT:
 		err := json.Unmarshal(a.Value, &value)
 		if err != nil {
 			apiError(rw, http.StatusBadRequest, "Invalid TXT value")
 			return "", true
 		}
-	case "SRV":
+	case dns.TypeSRV:
 		// TODO(melon): implement this
 		apiError(rw, http.StatusNotImplemented, "Not Implemented")
 		return "", true
-	case "CAA":
+	case dns.TypeCAA:
 		// TODO(melon): implement this
 		apiError(rw, http.StatusNotImplemented, "Not Implemented")
 		return "", true
