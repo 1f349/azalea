@@ -28,7 +28,8 @@ type recordResolver interface {
 }
 
 type recordValue struct {
-	Hdr   *dns.RR_Header
+	Name  string          `json:"name"`
+	Type  uint16          `json:"type"`
 	Value json.RawMessage `json:"value"`
 }
 
@@ -51,13 +52,13 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 			return
 		}
 
-		err = validateDomain.Check(a.Hdr.Name)
+		err = validateDomain.Check(a.Name)
 		if err != nil {
 			apiError(rw, http.StatusBadRequest, "Invalid record name")
 			return
 		}
 
-		if _, validType := dns.TypeToString[a.Hdr.Rrtype]; !validType {
+		if _, validType := dns.TypeToString[a.Type]; !validType {
 			apiError(rw, http.StatusBadRequest, "Invalid record type")
 			return
 		}
@@ -74,8 +75,8 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 		}
 		recordId, err := db.AddZoneRecord(req.Context(), database.AddZoneRecordParams{
 			Zone:   zone.ID,
-			Name:   a.Hdr.Name,
-			Type:   dns.TypeToString[a.Hdr.Rrtype],
+			Name:   a.Name,
+			Type:   dns.TypeToString[a.Type],
 			Locked: false,
 			Value:  value,
 		})
@@ -189,11 +190,8 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 		}
 
 		value, done := parseRecordValue(rw, recordValue{
-			Hdr: &dns.RR_Header{
-				Name:   zoneRecord.Name,
-				Rrtype: dns.StringToType[zoneRecord.Type],
-				Class:  dns.ClassINET,
-			},
+			Name:  zoneRecord.Name,
+			Type:  dns.StringToType[zoneRecord.Type],
 			Value: a.Value,
 		})
 		if done {
@@ -263,7 +261,7 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 
 func parseRecordValue(rw http.ResponseWriter, a recordValue) (string, bool) {
 	var value string
-	switch a.Hdr.Rrtype {
+	switch a.Type {
 	case dns.TypeMX:
 		// TODO(melon): implement this
 		apiError(rw, http.StatusNotImplemented, "Not Implemented")
@@ -280,7 +278,7 @@ func parseRecordValue(rw http.ResponseWriter, a recordValue) (string, bool) {
 			return "", true
 		}
 		// check if parsed address is valid for this record type
-		if (a.Hdr.Rrtype == dns.TypeA && ip.Is4()) || (a.Hdr.Rrtype == dns.TypeAAAA && ip.Is6()) {
+		if (a.Type == dns.TypeA && ip.Is4()) || (a.Type == dns.TypeAAAA && ip.Is6()) {
 			value = ip.String()
 		}
 	case dns.TypeCNAME:
