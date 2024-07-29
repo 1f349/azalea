@@ -273,7 +273,7 @@ func parseRecordValue(rw http.ResponseWriter, a recordValue) (string, bool) {
 			apiError(rw, http.StatusBadRequest, "Invalid MX record")
 			return "", true
 		}
-		if _, ok := dns.IsDomainName(value); !ok {
+		if _, ok := dns.IsDomainName(tmpValue.Mx); !ok {
 			apiError(rw, http.StatusBadRequest, "Invalid MX value")
 			return "", true
 		}
