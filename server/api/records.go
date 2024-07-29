@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/1f349/azalea/database"
 	"github.com/1f349/mjwt"
 	validateDomain "github.com/chmike/domain"
@@ -263,8 +264,20 @@ func parseRecordValue(rw http.ResponseWriter, a recordValue) (string, bool) {
 	var value string
 	switch a.Type {
 	case dns.TypeMX:
-		// TODO(melon): implement this
-		apiError(rw, http.StatusNotImplemented, "Not Implemented")
+		var tmpValue struct {
+			Mx         string `json:"mx"`
+			Preference int    `json:"preference"`
+		}
+		err := json.Unmarshal(a.Value, &tmpValue)
+		if err != nil {
+			apiError(rw, http.StatusBadRequest, "Invalid MX record")
+			return "", true
+		}
+		if _, ok := dns.IsDomainName(value); !ok {
+			apiError(rw, http.StatusBadRequest, "Invalid MX value")
+			return "", true
+		}
+		value = fmt.Sprintf("%d\t%s", tmpValue.Preference, dns.Fqdn(tmpValue.Mx))
 		return "", true
 	case dns.TypeA, dns.TypeAAAA:
 		var ip netip.Addr
