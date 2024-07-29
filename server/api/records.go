@@ -278,7 +278,6 @@ func parseRecordValue(rw http.ResponseWriter, a recordValue) (string, bool) {
 			return "", true
 		}
 		value = fmt.Sprintf("%d\t%s", tmpValue.Preference, dns.Fqdn(tmpValue.Mx))
-		return "", true
 	case dns.TypeA, dns.TypeAAAA:
 		var ip netip.Addr
 		err := json.Unmarshal(a.Value, &ip)
