@@ -331,7 +331,7 @@ func parseRecordValue(rw http.ResponseWriter, a recordValue) (string, bool) {
 }
 
 func validateRecordName(name string) error {
-	if name == "@" {
+	if name == "@" || name == "*" {
 		return nil
 	}
 	name = strings.TrimPrefix(name, "*.")
