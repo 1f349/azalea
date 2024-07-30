@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/netip"
 	"strconv"
+	"strings"
 )
 
 type recordQueries interface {
@@ -53,7 +54,7 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 			return
 		}
 
-		err = validateDomain.Check(a.Name)
+		err = validateRecordName(a.Name)
 		if err != nil {
 			apiError(rw, http.StatusBadRequest, "Invalid record name")
 			return
@@ -327,4 +328,13 @@ func parseRecordValue(rw http.ResponseWriter, a recordValue) (string, bool) {
 		return "", true
 	}
 	return value, false
+}
+
+func validateRecordName(name string) error {
+	if name == "@" {
+		return nil
+	}
+	name = strings.TrimPrefix(name, "*.")
+	name = strings.ReplaceAll(name, "_", "")
+	return validateDomain.Check(name)
 }
