@@ -17,10 +17,13 @@ type SRV struct {
 }
 
 func (srv *SRV) UnmarshalJSON(bytes []byte) error {
-	err := json.Unmarshal(bytes, srv)
+	type inner SRV
+	var a inner
+	err := json.Unmarshal(bytes, &a)
 	if err != nil {
 		return err
 	}
+	*srv = SRV(a)
 	if _, ok := dns.IsDomainName(srv.Target); !ok {
 		return errors.New("invalid MX value")
 	}

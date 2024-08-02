@@ -15,10 +15,13 @@ type MX struct {
 }
 
 func (mx *MX) UnmarshalJSON(bytes []byte) error {
-	err := json.Unmarshal(bytes, mx)
+	type inner MX
+	var a inner
+	err := json.Unmarshal(bytes, &a)
 	if err != nil {
 		return err
 	}
+	*mx = MX(a)
 	if _, ok := dns.IsDomainName(mx.Mx); !ok {
 		return errors.New("invalid MX value")
 	}
