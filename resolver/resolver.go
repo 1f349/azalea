@@ -40,7 +40,7 @@ func NewResolver(soa conf.SoaConf, db *database.Queries, geo *GeoResolver) *Reso
 
 func (r *Resolver) Authority(ctx context.Context, domain string) (soa *models.Record) {
 	tree := strings.Split(domain, ".")
-	for i, _ := range tree {
+	for i := range tree {
 		subdomain := strings.Join(tree[i:], ".")
 
 		answers, err := r.LookupAnswersForType(ctx, subdomain, dns.TypeSOA, nil)

@@ -49,7 +49,7 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 		dec.DisallowUnknownFields()
 		err := dec.Decode(&a)
 		if err != nil {
-			apiError(rw, http.StatusBadRequest, "Invalid JSON")
+			apiError(rw, http.StatusBadRequest, "Invalid JSON: "+err.Error())
 			return
 		}
 
@@ -159,7 +159,7 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 		dec.DisallowUnknownFields()
 		err := dec.Decode(&a)
 		if err != nil {
-			apiError(rw, http.StatusBadRequest, "Invalid JSON")
+			apiError(rw, http.StatusBadRequest, "Invalid JSON: "+err.Error())
 			return
 		}
 
