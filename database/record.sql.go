@@ -7,7 +7,8 @@ package database
 
 import (
 	"context"
-	"database/sql"
+
+	"github.com/gobuffalo/nulls"
 )
 
 const addZoneRecord = `-- name: AddZoneRecord :execlastid
@@ -135,14 +136,14 @@ type LookupRecordsForTypeParams struct {
 }
 
 type LookupRecordsForTypeRow struct {
-	ID       int32         `json:"id"`
-	Zone     int32         `json:"zone"`
-	Name     string        `json:"name"`
-	Type     string        `json:"type"`
-	Locked   bool          `json:"locked"`
-	Ttl      sql.NullInt32 `json:"ttl"`
-	Value    string        `json:"value"`
-	ZoneName string        `json:"zone_name"`
+	ID       int32        `json:"id"`
+	Zone     int32        `json:"zone"`
+	Name     string       `json:"name"`
+	Type     string       `json:"type"`
+	Locked   bool         `json:"locked"`
+	Ttl      nulls.UInt32 `json:"ttl"`
+	Value    string       `json:"value"`
+	ZoneName string       `json:"zone_name"`
 }
 
 func (q *Queries) LookupRecordsForType(ctx context.Context, arg LookupRecordsForTypeParams) ([]LookupRecordsForTypeRow, error) {

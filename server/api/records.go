@@ -5,14 +5,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/1f349/azalea/database"
+	"github.com/1f349/azalea/models"
 	"github.com/1f349/mjwt"
 	validateDomain "github.com/chmike/domain"
 	"github.com/julienschmidt/httprouter"
 	"github.com/miekg/dns"
 	"net/http"
-	"net/netip"
 	"strconv"
 	"strings"
 )
@@ -26,7 +25,7 @@ type recordQueries interface {
 }
 
 type recordResolver interface {
-	GetZoneRecords(ctx context.Context, zone string) ([]dns.RR, error)
+	GetZoneRecords(ctx context.Context, zone string) ([]*models.Record, error)
 }
 
 type recordValue struct {
@@ -137,7 +136,7 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 			apiError(rw, http.StatusInternalServerError, "Internal database error")
 			return
 		}
-		rr, err := zoneRecord.RR(domain, 300)
+		rr, err := zoneRecord.ConvertRecord(domain)
 		if err != nil {
 			apiError(rw, http.StatusInternalServerError, "Failed to generate record")
 			return
@@ -263,58 +262,20 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 
 func parseRecordValue(rw http.ResponseWriter, a recordValue) (string, bool) {
 	var value string
+	var tmpValue models.RecordValue
 	switch a.Type {
 	case dns.TypeMX:
-		var tmpValue struct {
-			Mx         string `json:"mx"`
-			Preference int    `json:"preference"`
-		}
-		err := json.Unmarshal(a.Value, &tmpValue)
-		if err != nil {
-			apiError(rw, http.StatusBadRequest, "Invalid MX record")
-			return "", true
-		}
-		if _, ok := dns.IsDomainName(tmpValue.Mx); !ok {
-			apiError(rw, http.StatusBadRequest, "Invalid MX value")
-			return "", true
-		}
-		value = fmt.Sprintf("%d\t%s", tmpValue.Preference, dns.Fqdn(tmpValue.Mx))
-	case dns.TypeA, dns.TypeAAAA:
-		var ip netip.Addr
-		err := json.Unmarshal(a.Value, &ip)
-		if err != nil {
-			apiError(rw, http.StatusBadRequest, "Invalid IP")
-			return "", true
-		}
-		if ip.Zone() != "" {
-			apiError(rw, http.StatusBadRequest, "Zones are not supported")
-			return "", true
-		}
-		// check if parsed address is valid for this record type
-		if (a.Type == dns.TypeA && ip.Is4()) || (a.Type == dns.TypeAAAA && ip.Is6()) {
-			value = ip.String()
-		}
+		tmpValue = new(models.MX)
+	case dns.TypeA:
+		tmpValue = new(models.A)
+	case dns.TypeAAAA:
+		tmpValue = new(models.AAAA)
 	case dns.TypeCNAME:
-		err := json.Unmarshal(a.Value, &value)
-		if err != nil {
-			apiError(rw, http.StatusBadRequest, "Invalid CNAME value")
-			return "", true
-		}
-		if _, ok := dns.IsDomainName(value); !ok {
-			apiError(rw, http.StatusBadRequest, "Invalid CNAME value")
-			return "", true
-		}
-		value = dns.Fqdn(value)
+		tmpValue = new(models.CNAME)
 	case dns.TypeTXT:
-		err := json.Unmarshal(a.Value, &value)
-		if err != nil {
-			apiError(rw, http.StatusBadRequest, "Invalid TXT value")
-			return "", true
-		}
+		tmpValue = new(models.TXT)
 	case dns.TypeSRV:
-		// TODO(melon): implement this
-		apiError(rw, http.StatusNotImplemented, "Not Implemented")
-		return "", true
+		tmpValue = new(models.SRV)
 	case dns.TypeCAA:
 		// TODO(melon): implement this
 		apiError(rw, http.StatusNotImplemented, "Not Implemented")
@@ -323,6 +284,12 @@ func parseRecordValue(rw http.ResponseWriter, a recordValue) (string, bool) {
 		apiError(rw, http.StatusBadRequest, "Invalid record type")
 		return "", true
 	}
+	err := json.Unmarshal(a.Value, &tmpValue)
+	if err != nil {
+		apiError(rw, http.StatusBadRequest, "Invalid record: "+err.Error())
+		return "", true
+	}
+	value = tmpValue.EncodeValue()
 	if value == "" {
 		apiError(rw, http.StatusBadRequest, "Invalid record value")
 		return "", true

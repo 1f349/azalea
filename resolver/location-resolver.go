@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/1f349/azalea/database"
 	"github.com/1f349/azalea/logger"
+	"github.com/1f349/azalea/models"
 	"github.com/miekg/dns"
 	"github.com/oschwald/geoip2-golang"
 	"net"
@@ -52,39 +53,32 @@ func (l *GeoResolver) GetBestLocation(ctx context.Context, name string, remoteIp
 	})
 }
 
+// GeoResolvedRecords returns the record for a service name closest to the remoteIp
 // TODO(melon): add tests for this
-func (l *GeoResolver) GeoResolvedRecords(ctx context.Context, name string, remoteIp net.IP) ([]dns.RR, error) {
+func (l *GeoResolver) GeoResolvedRecords(ctx context.Context, name string, remoteIp net.IP) ([]*models.Record, error) {
 	resolvedRecord, err := l.GetBestLocation(ctx, name, remoteIp)
 	logger.Logger.Info("hi", "rec", resolvedRecord, "err", err, "name", name, "ip", remoteIp)
 	if err != nil {
 		return nil, err
 	}
 	sep := strings.Split(resolvedRecord.Value, ",")
-	var rrs []dns.RR
+	var rrs []*models.Record
 	for _, i := range sep {
 		ip, err := netip.ParseAddr(i)
 		if err != nil {
 			return nil, err
 		}
 		if ip.Is4() {
-			rrs = append(rrs, &dns.A{
-				Hdr: dns.RR_Header{
-					Name:   name,
-					Rrtype: dns.TypeA,
-					Class:  dns.ClassINET,
-					Ttl:    300,
-				},
-				A: ip.AsSlice(),
+			rrs = append(rrs, &models.Record{
+				Name:  name,
+				Type:  dns.TypeA,
+				Value: &models.A{IP: ip.AsSlice()},
 			})
 		} else if ip.Is6() {
-			rrs = append(rrs, &dns.AAAA{
-				Hdr: dns.RR_Header{
-					Name:   name,
-					Rrtype: dns.TypeAAAA,
-					Class:  dns.ClassINET,
-					Ttl:    300,
-				},
-				AAAA: ip.AsSlice(),
+			rrs = append(rrs, &models.Record{
+				Name:  name,
+				Type:  dns.TypeAAAA,
+				Value: &models.AAAA{IP: ip.AsSlice()},
 			})
 		}
 	}

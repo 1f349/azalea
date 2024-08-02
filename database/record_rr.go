@@ -3,23 +3,20 @@ package database
 import (
 	"fmt"
 	"github.com/1f349/azalea/converters"
+	"github.com/1f349/azalea/models"
 	"github.com/1f349/azalea/utils"
 	"github.com/miekg/dns"
 	"strings"
 )
 
-func (r Record) RR(zone string, defaultTtl uint32) (dns.RR, error) {
+func (r Record) ConvertRecord(zone string) (*models.Record, error) {
 	name := utils.ResolveRecordName(r.Name, zone)
-	header := dns.RR_Header{
-		Name:   name,
-		Rrtype: dns.StringToType[r.Type],
-		Class:  dns.ClassINET,
-		Ttl:    defaultTtl,
+	record := &models.Record{
+		Name: name,
+		Type: dns.StringToType[r.Type],
+		Ttl:  r.Ttl,
 	}
-	if r.Ttl.Valid {
-		header.Ttl = uint32(r.Ttl.Int32)
-	}
-	if header.Rrtype == dns.TypeNone {
+	if record.Type == dns.TypeNone {
 		return nil, converters.ErrInvalidRecord{Name: name, Value: r.Value, AType: r.Type, Reason: fmt.Errorf("invalid type %s", r.Type)}
 	}
 
@@ -28,18 +25,23 @@ func (r Record) RR(zone string, defaultTtl uint32) (dns.RR, error) {
 	if len(data) == 0 {
 		return nil, converters.ErrInvalidRecord{Name: name, Value: r.Value, AType: r.Type, Reason: converters.ErrInvalidSegmentCount}
 	}
-	rr, err := converters.Converters[header.Rrtype](data, header)
+	convert, found := converters.Converters[record.Type]
+	if !found {
+		return nil, converters.ErrInvalidRecord{Name: name, Value: r.Value, AType: r.Type, Reason: fmt.Errorf("unsupported record type %s", r.Type)}
+	}
+	recordValue, err := convert(data)
 	if err != nil {
 		return nil, converters.ErrInvalidRecord{Name: name, Value: r.Value, AType: r.Type, Reason: err}
 	}
-	return rr, nil
+	record.Value = recordValue
+	return record, nil
 }
 
 func (r Record) IsLocationResolving() bool {
 	return r.Type == "LOC_RES"
 }
 
-func (r LookupRecordsForTypeRow) RR(defaultTtl uint32) (dns.RR, error) {
+func (r LookupRecordsForTypeRow) ConvertRecord() (*models.Record, error) {
 	return Record{
 		ID:     r.ID,
 		Zone:   r.Zone,
@@ -48,7 +50,7 @@ func (r LookupRecordsForTypeRow) RR(defaultTtl uint32) (dns.RR, error) {
 		Locked: r.Locked,
 		Ttl:    r.Ttl,
 		Value:  r.Value,
-	}.RR(r.ZoneName, defaultTtl)
+	}.ConvertRecord(r.ZoneName)
 }
 
 func (r LookupRecordsForTypeRow) IsLocationResolving() bool {

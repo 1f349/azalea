@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/1f349/azalea/database"
+	"github.com/1f349/azalea/models"
 	"github.com/1f349/mjwt/auth"
 	"github.com/1f349/mjwt/claims"
 	"github.com/golang-jwt/jwt/v4"
@@ -44,50 +45,36 @@ func (f *fakeDomainQueries) GetZone(ctx context.Context, zone string) (database.
 
 type fakeResolver struct{}
 
-func (f *fakeResolver) GetZoneRecords(ctx context.Context, zone string) ([]dns.RR, error) {
+func (f *fakeResolver) GetZoneRecords(ctx context.Context, zone string) ([]*models.Record, error) {
 	if zone == "example.com." {
-		return []dns.RR{
-			&dns.SOA{
-				Hdr: dns.RR_Header{
-					Name:   "example.com.",
-					Rrtype: dns.TypeSOA,
-					Class:  dns.ClassINET,
-					Ttl:    300,
+		return []*models.Record{
+			{
+				Name: "example.com.",
+				Type: dns.TypeSOA,
+				Value: &models.SOA{
+					Ns:      "ns1.example.com.",
+					Mbox:    "postmaster.example.com.",
+					Serial:  1,
+					Refresh: 300,
+					Retry:   300,
+					Expire:  300,
+					Minttl:  300,
 				},
-				Ns:      "ns1.example.com.",
-				Mbox:    "postmaster.example.com.",
-				Serial:  1,
-				Refresh: 300,
-				Retry:   300,
-				Expire:  300,
-				Minttl:  300,
 			},
-			&dns.NS{
-				Hdr: dns.RR_Header{
-					Name:   "example.com.",
-					Rrtype: dns.TypeNS,
-					Class:  dns.ClassINET,
-					Ttl:    300,
-				},
-				Ns: "ns1.example.com.",
+			{
+				Name:  "example.com.",
+				Type:  dns.TypeNS,
+				Value: &models.NS{Ns: "ns1.example.com."},
 			},
-			&dns.A{
-				Hdr: dns.RR_Header{
-					Name:   "example.com.",
-					Rrtype: dns.TypeA,
-					Class:  dns.ClassINET,
-					Ttl:    300,
-				},
-				A: net.IPv4(10, 0, 0, 1),
+			{
+				Name:  "example.com.",
+				Type:  dns.TypeA,
+				Value: &models.A{IP: net.IPv4(10, 0, 0, 1)},
 			},
-			&dns.A{
-				Hdr: dns.RR_Header{
-					Name:   "ns1.example.com.",
-					Rrtype: dns.TypeA,
-					Class:  dns.ClassINET,
-					Ttl:    300,
-				},
-				A: net.IPv4(10, 0, 26, 5),
+			{
+				Name:  "ns1.example.com.",
+				Type:  dns.TypeA,
+				Value: &models.A{IP: net.IPv4(10, 0, 26, 5)},
 			},
 		}, nil
 	}

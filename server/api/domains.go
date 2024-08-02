@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/1f349/azalea/database"
+	"github.com/1f349/azalea/models"
 	"github.com/1f349/mjwt"
 	"github.com/julienschmidt/httprouter"
 	"github.com/miekg/dns"
@@ -21,7 +22,7 @@ type domainQueries interface {
 }
 
 type domainResolver interface {
-	GetZoneRecords(ctx context.Context, zone string) ([]dns.RR, error)
+	GetZoneRecords(ctx context.Context, zone string) ([]*models.Record, error)
 }
 
 func AddDomainEndpoints(r *httprouter.Router, db domainQueries, res domainResolver, verify mjwt.Verifier) {
@@ -114,7 +115,7 @@ func AddDomainEndpoints(r *httprouter.Router, db domainQueries, res domainResolv
 		}
 
 		for _, i := range records {
-			line := i.String()
+			line := i.RR(300).String()
 
 			if strings.Count(line, "\t") > 2 {
 				prefix, suffix, _ := strings.Cut(line, "\t")

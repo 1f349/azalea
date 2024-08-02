@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"github.com/1f349/azalea/database"
+	"github.com/1f349/azalea/models"
 	"github.com/1f349/mjwt/auth"
 	"github.com/1f349/mjwt/claims"
 	"github.com/golang-jwt/jwt/v4"
@@ -109,48 +110,40 @@ func TestAddRecordEndpoints(t *testing.T) {
 		doTestRequest(t, "invalid domain", req, r, http.StatusNotFound, "Invalid domain")
 		req = makeReq("")
 		req.Header.Set("Authorization", "Bearer "+makeToken())
-		encodeRR, err := json.Marshal([]dns.RR{
-			&dns.SOA{
-				Hdr: dns.RR_Header{
-					Name:   "example.com.",
-					Rrtype: dns.TypeSOA,
-					Class:  dns.ClassINET,
-					Ttl:    300,
+		encodeRR, err := json.Marshal([]*models.Record{
+			{
+				Name: "example.com.",
+				Type: dns.TypeSOA,
+				Value: &models.SOA{
+					Ns:      "ns1.example.com.",
+					Mbox:    "postmaster.example.com.",
+					Serial:  1,
+					Refresh: 300,
+					Retry:   300,
+					Expire:  300,
+					Minttl:  300,
 				},
-				Ns:      "ns1.example.com.",
-				Mbox:    "postmaster.example.com.",
-				Serial:  1,
-				Refresh: 300,
-				Retry:   300,
-				Expire:  300,
-				Minttl:  300,
 			},
-			&dns.NS{
-				Hdr: dns.RR_Header{
-					Name:   "example.com.",
-					Rrtype: dns.TypeNS,
-					Class:  dns.ClassINET,
-					Ttl:    300,
+			{
+				Name: "example.com.",
+				Type: dns.TypeNS,
+				Value: &models.NS{
+					Ns: "ns1.example.com.",
 				},
-				Ns: "ns1.example.com.",
 			},
-			&dns.A{
-				Hdr: dns.RR_Header{
-					Name:   "example.com.",
-					Rrtype: dns.TypeA,
-					Class:  dns.ClassINET,
-					Ttl:    300,
+			{
+				Name: "example.com.",
+				Type: dns.TypeA,
+				Value: &models.A{
+					IP: net.IPv4(10, 0, 0, 1),
 				},
-				A: net.IPv4(10, 0, 0, 1),
 			},
-			&dns.A{
-				Hdr: dns.RR_Header{
-					Name:   "ns1.example.com.",
-					Rrtype: dns.TypeA,
-					Class:  dns.ClassINET,
-					Ttl:    300,
+			{
+				Name: "ns1.example.com.",
+				Type: dns.TypeA,
+				Value: &models.A{
+					IP: net.IPv4(10, 0, 26, 5),
 				},
-				A: net.IPv4(10, 0, 26, 5),
 			},
 		})
 		assert.NoError(t, err)
@@ -165,14 +158,10 @@ func TestAddRecordEndpoints(t *testing.T) {
 		doTestRequest(t, "invalid domain", req, r, http.StatusNotFound, "Invalid domain")
 		req = makeReq("")
 		req.Header.Set("Authorization", "Bearer "+makeToken())
-		encodeRR, err := json.Marshal(&dns.A{
-			Hdr: dns.RR_Header{
-				Name:   "example.com.",
-				Rrtype: dns.TypeA,
-				Class:  dns.ClassINET,
-				Ttl:    300,
-			},
-			A: net.IPv4(10, 0, 31, 1),
+		encodeRR, err := json.Marshal(&models.Record{
+			Name:  "example.com.",
+			Type:  dns.TypeA,
+			Value: &models.A{IP: net.IPv4(10, 0, 31, 1)},
 		})
 		assert.NoError(t, err)
 		doTestRequest(t, "ok", req, r, http.StatusOK, string(encodeRR))
@@ -195,7 +184,7 @@ func TestAddRecordEndpoints(t *testing.T) {
 		doTestRequest(t, "unknown record id", req, r, http.StatusBadRequest, "Invalid record ID")
 		req = makeReq(`{"value":"example.org"}`)
 		req.Header.Set("Authorization", "Bearer "+makeToken())
-		doTestRequest(t, "invalid record value", req, r, http.StatusBadRequest, "Invalid IP")
+		doTestRequest(t, "invalid record value", req, r, http.StatusBadRequest, "Invalid record: ParseAddr(\"example.org\"): unexpected character (at \"example.org\")")
 		req = baseMakeReq(http.MethodPut, "/domains/example.com/records/1")(`{"value":"10.0.26.5"}`)
 		req.Header.Set("Authorization", "Bearer "+makeToken())
 		doTestRequest(t, "record locked", req, r, http.StatusConflict, "Record locked")

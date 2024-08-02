@@ -9,7 +9,5 @@ sql:
         out: "database"
         emit_json_tags: true
         overrides:
-          - column: "a_records.value"
-            go_type: "net.IP"
-          - column: "aaaa_records.value"
-            go_type: "net.IP"
+          - column: "records.ttl"
+            go_type: 'github.com/gobuffalo/nulls.UInt32'

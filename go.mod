@@ -7,6 +7,7 @@ require (
 	github.com/1f349/violet v0.0.14
 	github.com/charmbracelet/log v0.4.0
 	github.com/chmike/domain v1.0.1
+	github.com/gobuffalo/nulls v0.4.2
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/golang-migrate/migrate/v4 v4.17.1
 	github.com/google/subcommands v1.2.0
@@ -28,7 +29,8 @@ require (
 	github.com/charmbracelet/x/ansi v0.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
-	github.com/go-sql-driver/mysql v1.5.0 // indirect
+	github.com/go-sql-driver/mysql v1.6.0 // indirect
+	github.com/gofrs/uuid v4.2.0+incompatible // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect

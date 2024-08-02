@@ -16,8 +16,8 @@ func TestRecord_ZoneFileLine(t *testing.T) {
 		{Record{Name: "ns1", Type: "AAAA", Value: "fd01::1:0"}, "ns1.example.com.\t300\tIN\tAAAA\tfd01::1:0"},
 	}
 	for _, i := range tests {
-		rr, err := i.record.RR("example.com.", 300)
+		rr, err := i.record.ConvertRecord("example.com.")
 		assert.NoError(t, err)
-		assert.Equal(t, i.target, rr.String())
+		assert.Equal(t, i.target, rr.RR(300).String())
 	}
 }

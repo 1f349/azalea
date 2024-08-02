@@ -7,6 +7,7 @@ import (
 	"github.com/1f349/azalea/converters"
 	"github.com/1f349/azalea/database"
 	"github.com/1f349/azalea/logger"
+	"github.com/1f349/azalea/models"
 	"github.com/1f349/azalea/utils"
 	"github.com/miekg/dns"
 	"github.com/rcrowley/go-metrics"
@@ -37,7 +38,7 @@ func NewResolver(soa conf.SoaConf, db *database.Queries, geo *GeoResolver) *Reso
 	}
 }
 
-func (r *Resolver) Authority(ctx context.Context, domain string) (soa *dns.SOA) {
+func (r *Resolver) Authority(ctx context.Context, domain string) (soa *models.Record) {
 	tree := strings.Split(domain, ".")
 	for i, _ := range tree {
 		subdomain := strings.Join(tree[i:], ".")
@@ -48,7 +49,7 @@ func (r *Resolver) Authority(ctx context.Context, domain string) (soa *dns.SOA) 
 		}
 
 		if len(answers) == 1 {
-			soa = answers[0].(*dns.SOA)
+			soa = answers[0]
 			return
 		}
 	}
@@ -66,11 +67,11 @@ func (r *Resolver) Lookup(ctx context.Context, req *dns.Msg, addr net.Addr) (msg
 	msg.Authoritative = true
 	msg.RecursionAvailable = false
 
-	var answers []dns.RR
+	var answers []*models.Record
 	var errors []error
 	errored := false
 
-	var aChan chan dns.RR
+	var aChan chan *models.Record
 	var eChan chan error
 
 	if q.Qclass == dns.ClassINET {
@@ -115,23 +116,24 @@ func (r *Resolver) Lookup(ctx context.Context, req *dns.Msg, addr net.Addr) (msg
 		missCounter.Inc(1)
 		msg.SetRcode(req, dns.RcodeNameError)
 		if soa != nil {
-			msg.Ns = []dns.RR{soa}
+			msg.Ns = []dns.RR{soa.RR(300)} // TODO(melon): per domain default ttl
 		} else {
 			msg.Authoritative = false // No SOA? We're not authoritative
 		}
 	} else {
 		hitCounter.Inc(1)
-		for _, rr := range answers {
+		for _, record := range answers {
+			rr := record.RR(300)
 			rr.Header().Name = q.Name
-			msg.Answer = append(msg.Answer, rr)
+			msg.Answer = append(msg.Answer, rr) // TODO(melon): per domain default ttl
 		}
 	}
 
 	return
 }
 
-func gatherFromChannels(rrsIn chan dns.RR, errsIn chan error) (rrs []dns.RR, errs []error) {
-	rrs = []dns.RR{}
+func gatherFromChannels(rrsIn chan *models.Record, errsIn chan error) (rrs []*models.Record, errs []error) {
+	rrs = []*models.Record{}
 	errs = []error{}
 	done := 0
 	for done < 2 {
@@ -159,8 +161,8 @@ func gatherFromChannels(rrsIn chan dns.RR, errsIn chan error) (rrs []dns.RR, err
 // the way. The function will return immediately, and spawn off a bunch of goroutines
 // to do the work, when using this function one should use a WaitGroup to know when all work
 // has been completed.
-func (r *Resolver) AnswerQuestion(ctx context.Context, q dns.Question, addr net.Addr) (answers chan dns.RR, errors chan error) {
-	answers = make(chan dns.RR)
+func (r *Resolver) AnswerQuestion(ctx context.Context, q dns.Question, addr net.Addr) (answers chan *models.Record, errors chan error) {
+	answers = make(chan *models.Record)
 	errors = make(chan error)
 
 	typeStr := dns.TypeToString[q.Qtype]
@@ -208,13 +210,13 @@ func (r *Resolver) AnswerQuestion(ctx context.Context, q dns.Question, addr net.
 	return answers, errors
 }
 
-func (r *Resolver) LookupAnswersForType(ctx context.Context, name string, rrType uint16, addr net.Addr) (answers []dns.RR, err error) {
+func (r *Resolver) LookupAnswersForType(ctx context.Context, name string, rrType uint16, addr net.Addr) (answers []*models.Record, err error) {
 	name = strings.ToLower(name)
 
 	switch rrType {
 	case dns.TypeSOA:
 		record := r.getSoaRecord(name)
-		return []dns.RR{record}, nil
+		return []*models.Record{record}, nil
 	case dns.TypeNS:
 		records := r.getNsRecords(name)
 		if len(records) == 0 {
@@ -239,7 +241,7 @@ func (r *Resolver) LookupAnswersForType(ctx context.Context, name string, rrType
 	}
 
 	// convert records to dns.RR and process location resolving records
-	rrs := make([]dns.RR, 0, len(records))
+	rrs := make([]*models.Record, 0, len(records))
 	for _, record := range records {
 		if record.IsLocationResolving() {
 			if addr != nil {
@@ -257,7 +259,7 @@ func (r *Resolver) LookupAnswersForType(ctx context.Context, name string, rrType
 			continue
 		}
 		// convert to an RR record
-		rr, err := record.RR(r.soa.Ttl)
+		rr, err := record.ConvertRecord()
 		if err != nil {
 			return nil, err
 		}
@@ -267,13 +269,13 @@ func (r *Resolver) LookupAnswersForType(ctx context.Context, name string, rrType
 	return rrs, nil
 }
 
-func (r *Resolver) GetAllRecords(ctx context.Context) ([]dns.RR, error) {
+func (r *Resolver) GetAllRecords(ctx context.Context) ([]*models.Record, error) {
 	zones, err := r.db.GetZones(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	rrs := make([]dns.RR, 0)
+	rrs := make([]*models.Record, 0)
 	for _, i := range zones {
 		zoneRecords, err := r.GetZoneRecords(ctx, i.Name)
 		if err != nil {
@@ -285,7 +287,7 @@ func (r *Resolver) GetAllRecords(ctx context.Context) ([]dns.RR, error) {
 	return rrs, nil
 }
 
-func (r *Resolver) GetZoneRecords(ctx context.Context, zone string) ([]dns.RR, error) {
+func (r *Resolver) GetZoneRecords(ctx context.Context, zone string) ([]*models.Record, error) {
 	_, err := r.db.GetZone(ctx, zone)
 	if err != nil {
 		return nil, err
@@ -296,25 +298,23 @@ func (r *Resolver) GetZoneRecords(ctx context.Context, zone string) ([]dns.RR, e
 		return nil, err
 	}
 
-	rrs := make([]dns.RR, 0, len(records)+1+len(r.soa.Ns)) // preallocate for all records
+	rrs := make([]*models.Record, 0, len(records)+1+len(r.soa.Ns)) // preallocate for all records
 	rrs = append(rrs, r.getSoaRecord(zone))
 	rrs = append(rrs, r.getNsRecords(zone)...)
 
 	for _, i := range records {
 		if i.IsLocationResolving() {
 			name := utils.ResolveRecordName(i.Name, zone)
-			rrs = append(rrs, &dns.TXT{
-				Hdr: dns.RR_Header{
-					Name:   "_loc_res." + name,
-					Rrtype: dns.TypeTXT,
-					Class:  dns.ClassCHAOS,
-					Ttl:    300,
+			rrs = append(rrs, &models.Record{
+				Name: "_loc_res." + name,
+				Type: dns.TypeTXT,
+				Value: &models.TXT{
+					Value: i.Value,
 				},
-				Txt: []string{i.Value},
 			})
 			continue
 		}
-		rr, err := i.RR(zone, r.soa.Ttl)
+		rr, err := i.ConvertRecord(zone)
 		if err != nil {
 			return nil, err
 		}
@@ -324,7 +324,7 @@ func (r *Resolver) GetZoneRecords(ctx context.Context, zone string) ([]dns.RR, e
 	return rrs, nil
 }
 
-func (r *Resolver) getSoaRecord(zone string) *dns.SOA {
+func (r *Resolver) getSoaRecord(zone string) *models.Record {
 	n := time.Now()
 	year, month, day := n.Date()
 	n2 := uint32(year*1e6 + int(month*1e4) + day*1e2 + 01)
@@ -334,34 +334,30 @@ func (r *Resolver) getSoaRecord(zone string) *dns.SOA {
 		return nil
 	}
 
-	return &dns.SOA{
-		Hdr: dns.RR_Header{
-			Name:   dns.Fqdn(rootZone),
-			Rrtype: dns.TypeSOA,
-			Class:  dns.ClassINET,
-			Ttl:    r.soa.Ttl,
+	return &models.Record{
+		Name: dns.Fqdn(rootZone),
+		Type: dns.TypeSOA,
+		Value: &models.SOA{
+			Ns:      dns.Fqdn(r.soa.Ns[0]),
+			Mbox:    dns.Fqdn(r.soa.Mbox),
+			Serial:  n2,
+			Refresh: r.soa.Refresh,
+			Retry:   r.soa.Retry,
+			Expire:  r.soa.Expire,
+			Minttl:  r.soa.Ttl,
 		},
-		Ns:      dns.Fqdn(r.soa.Ns[0]),
-		Mbox:    dns.Fqdn(r.soa.Mbox),
-		Serial:  n2,
-		Refresh: r.soa.Refresh,
-		Retry:   r.soa.Retry,
-		Expire:  r.soa.Expire,
-		Minttl:  r.soa.Ttl,
 	}
 }
 
-func (r *Resolver) getNsRecords(zone string) []dns.RR {
-	rrs := make([]dns.RR, 0)
+func (r *Resolver) getNsRecords(zone string) []*models.Record {
+	rrs := make([]*models.Record, 0, len(r.soa.Ns))
 	for _, ns := range r.soa.Ns {
-		rrs = append(rrs, &dns.NS{
-			Hdr: dns.RR_Header{
-				Name:   zone,
-				Rrtype: dns.TypeNS,
-				Class:  dns.ClassINET,
-				Ttl:    r.soa.Ttl,
+		rrs = append(rrs, &models.Record{
+			Name: zone,
+			Type: dns.TypeNS,
+			Value: &models.NS{
+				Ns: dns.Fqdn(ns),
 			},
-			Ns: dns.Fqdn(ns),
 		})
 	}
 	return rrs

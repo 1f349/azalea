@@ -5,17 +5,17 @@
 package database
 
 import (
-	"database/sql"
+	"github.com/gobuffalo/nulls"
 )
 
 type Record struct {
-	ID     int32         `json:"id"`
-	Zone   int32         `json:"zone"`
-	Name   string        `json:"name"`
-	Type   string        `json:"type"`
-	Locked bool          `json:"locked"`
-	Ttl    sql.NullInt32 `json:"ttl"`
-	Value  string        `json:"value"`
+	ID     int32        `json:"id"`
+	Zone   int32        `json:"zone"`
+	Name   string       `json:"name"`
+	Type   string       `json:"type"`
+	Locked bool         `json:"locked"`
+	Ttl    nulls.UInt32 `json:"ttl"`
+	Value  string       `json:"value"`
 }
 
 type Service struct {
