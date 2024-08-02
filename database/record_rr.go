@@ -12,6 +12,7 @@ import (
 func (r Record) ConvertRecord(zone string) (*models.Record, error) {
 	name := utils.ResolveRecordName(r.Name, zone)
 	record := &models.Record{
+		Id:   int64(r.ID),
 		Name: name,
 		Type: dns.StringToType[r.Type],
 		Ttl:  r.Ttl,

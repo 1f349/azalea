@@ -306,6 +306,7 @@ func (r *Resolver) GetZoneRecords(ctx context.Context, zone string) ([]*models.R
 		if i.IsLocationResolving() {
 			name := utils.ResolveRecordName(i.Name, zone)
 			rrs = append(rrs, &models.Record{
+				Id:   models.DynamicRecords,
 				Name: "_loc_res." + name,
 				Type: dns.TypeTXT,
 				Value: &models.TXT{
@@ -335,6 +336,7 @@ func (r *Resolver) getSoaRecord(zone string) *models.Record {
 	}
 
 	return &models.Record{
+		Id:   models.StaticSoaRecord,
 		Name: dns.Fqdn(rootZone),
 		Type: dns.TypeSOA,
 		Value: &models.SOA{
@@ -353,6 +355,7 @@ func (r *Resolver) getNsRecords(zone string) []*models.Record {
 	rrs := make([]*models.Record, 0, len(r.soa.Ns))
 	for _, ns := range r.soa.Ns {
 		rrs = append(rrs, &models.Record{
+			Id:   models.StaticNsRecord,
 			Name: zone,
 			Type: dns.TypeNS,
 			Value: &models.NS{

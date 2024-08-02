@@ -5,7 +5,12 @@ import (
 	"github.com/miekg/dns"
 )
 
+const StaticSoaRecord = -1
+const StaticNsRecord = -2
+const DynamicRecords = -3
+
 type Record struct {
+	Id    int64        `json:"id"`
 	Name  string       `json:"name"`
 	Type  uint16       `json:"type"`
 	Ttl   nulls.UInt32 `json:"ttl"`

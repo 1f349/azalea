@@ -70,12 +70,14 @@ func (l *GeoResolver) GeoResolvedRecords(ctx context.Context, name string, remot
 		}
 		if ip.Is4() {
 			rrs = append(rrs, &models.Record{
+				Id:    models.DynamicRecords,
 				Name:  name,
 				Type:  dns.TypeA,
 				Value: &models.A{IP: ip.AsSlice()},
 			})
 		} else if ip.Is6() {
 			rrs = append(rrs, &models.Record{
+				Id:    models.DynamicRecords,
 				Name:  name,
 				Type:  dns.TypeAAAA,
 				Value: &models.AAAA{IP: ip.AsSlice()},
