@@ -25,7 +25,7 @@ type domainResolver interface {
 	GetZoneRecords(ctx context.Context, zone string) ([]*models.Record, error)
 }
 
-func AddDomainEndpoints(r *httprouter.Router, db domainQueries, res domainResolver, verify mjwt.Verifier) {
+func AddDomainEndpoints(r *httprouter.Router, db domainQueries, res domainResolver, verify *mjwt.KeyStore) {
 	// Endpoints for domains
 	r.POST("/domains", checkAuthWithPerm(verify, "azalea:domains", func(rw http.ResponseWriter, req *http.Request, params httprouter.Params, b AuthClaims) {
 		var a struct {

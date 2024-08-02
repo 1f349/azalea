@@ -6,7 +6,6 @@ import (
 	"github.com/1f349/azalea/database"
 	"github.com/1f349/azalea/models"
 	"github.com/1f349/mjwt/auth"
-	"github.com/1f349/mjwt/claims"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/julienschmidt/httprouter"
 	"github.com/miekg/dns"
@@ -121,10 +120,10 @@ func baseMakeReq(method, url string) func(body string) *http.Request {
 func TestAddDomainEndpoints(t *testing.T) {
 	r := httprouter.New()
 	signer := genSigner(t)
-	AddDomainEndpoints(r, &fakeDomainQueries{}, &fakeResolver{}, signer)
+	AddDomainEndpoints(r, &fakeDomainQueries{}, &fakeResolver{}, signer.KeyStore())
 
 	makeToken := func() string {
-		ps := claims.NewPermStorage()
+		ps := auth.NewPermStorage()
 		ps.Set("azalea:domains")
 		ps.Set("domain:owns=example.com")
 		return mustGen(signer, "1234", "1234", jwt.ClaimStrings{"example.com"}, 15*time.Minute, &auth.AccessTokenClaims{Perms: ps})

@@ -7,7 +7,6 @@ import (
 	"github.com/1f349/azalea/database"
 	"github.com/1f349/azalea/models"
 	"github.com/1f349/mjwt/auth"
-	"github.com/1f349/mjwt/claims"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/julienschmidt/httprouter"
 	"github.com/miekg/dns"
@@ -76,10 +75,10 @@ func (f *fakeRecordQueries) DeleteZoneRecordById(ctx context.Context, params dat
 func TestAddRecordEndpoints(t *testing.T) {
 	r := httprouter.New()
 	signer := genSigner(t)
-	AddRecordEndpoints(r, &fakeRecordQueries{}, &fakeResolver{}, signer)
+	AddRecordEndpoints(r, &fakeRecordQueries{}, &fakeResolver{}, signer.KeyStore())
 
 	makeToken := func() string {
-		ps := claims.NewPermStorage()
+		ps := auth.NewPermStorage()
 		ps.Set("azalea:domains")
 		ps.Set("domain:owns=example.com")
 		return mustGen(signer, "1234", "1234", jwt.ClaimStrings{"example.com"}, 15*time.Minute, &auth.AccessTokenClaims{Perms: ps})

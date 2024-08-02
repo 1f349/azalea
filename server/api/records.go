@@ -34,7 +34,7 @@ type recordValue struct {
 	Value json.RawMessage `json:"value"`
 }
 
-func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolver, verify mjwt.Verifier) {
+func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolver, verify *mjwt.KeyStore) {
 	// Endpoints for records
 	r.POST("/domains/:domain/records", checkAuthWithPerm(verify, "azalea:domains", func(rw http.ResponseWriter, req *http.Request, params httprouter.Params, b AuthClaims) {
 		domain := dns.Fqdn(params.ByName("domain"))

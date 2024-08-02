@@ -14,7 +14,7 @@ type AuthCallback func(rw http.ResponseWriter, req *http.Request, params httprou
 
 // checkAuth validates the bearer token against a mjwt.Verifier and returns an
 // error message or continues to the next handler
-func checkAuth(verify mjwt.Verifier, cb AuthCallback) httprouter.Handle {
+func checkAuth(verify *mjwt.KeyStore, cb AuthCallback) httprouter.Handle {
 	return func(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
 		// Get bearer token
 		bearer := utils.GetBearer(req)
@@ -37,7 +37,7 @@ func checkAuth(verify mjwt.Verifier, cb AuthCallback) httprouter.Handle {
 // checkAuthWithPerm validates the bearer token and checks if it contains a
 // required permission and returns an error message or continues to the next
 // handler
-func checkAuthWithPerm(verify mjwt.Verifier, perm string, cb AuthCallback) httprouter.Handle {
+func checkAuthWithPerm(verify *mjwt.KeyStore, perm string, cb AuthCallback) httprouter.Handle {
 	return checkAuth(verify, func(rw http.ResponseWriter, req *http.Request, params httprouter.Params, b AuthClaims) {
 		// check perms
 		if !b.Claims.Perms.Has(perm) {

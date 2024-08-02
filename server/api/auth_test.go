@@ -1,11 +1,8 @@
 package api
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
 	"github.com/1f349/mjwt"
 	"github.com/1f349/mjwt/auth"
-	"github.com/1f349/mjwt/claims"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/julienschmidt/httprouter"
 	"github.com/stretchr/testify/assert"
@@ -16,13 +13,13 @@ import (
 	"time"
 )
 
-func genSigner(t *testing.T) mjwt.Signer {
-	key, err := rsa.GenerateKey(rand.Reader, 1024)
+func genSigner(t *testing.T) *mjwt.Issuer {
+	a, err := mjwt.NewIssuer("test", "test", jwt.SigningMethodRS512)
 	assert.NoError(t, err)
-	return mjwt.NewMJwtSigner("test", key)
+	return a
 }
 
-func mustGen(signer mjwt.Signer, sub, id string, aud jwt.ClaimStrings, dur time.Duration, claims mjwt.Claims) string {
+func mustGen(signer *mjwt.Issuer, sub, id string, aud jwt.ClaimStrings, dur time.Duration, claims mjwt.Claims) string {
 	key, err := signer.GenerateJwt(sub, id, aud, dur, claims)
 	if err != nil {
 		panic(err)
@@ -38,11 +35,11 @@ func mustReadAll(r io.Reader) string {
 	return string(all)
 }
 
-func doReq(t *testing.T, signer mjwt.Signer, key string, testStatus int, testBody string) {
+func doReq(t *testing.T, signer *mjwt.Issuer, key string, testStatus int, testBody string) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "https://example.com", nil)
 	req.Header.Set("Authorization", "Bearer "+key)
-	checkAuth(signer, func(rw http.ResponseWriter, req *http.Request, params httprouter.Params, b AuthClaims) {
+	checkAuth(signer.KeyStore(), func(rw http.ResponseWriter, req *http.Request, params httprouter.Params, b AuthClaims) {
 		assert.Equal(t, "Bearer "+key, req.Header.Get("Authorization"))
 		assert.Equal(t, "access-token", b.ClaimType)
 		assert.Equal(t, jwt.ClaimStrings{"example.com"}, b.Audience)
@@ -53,11 +50,11 @@ func doReq(t *testing.T, signer mjwt.Signer, key string, testStatus int, testBod
 	assert.Equal(t, testBody, mustReadAll(res.Body))
 }
 
-func doReqWithPerm(t *testing.T, signer mjwt.Signer, key, perm string, testStatus int, testBody string) {
+func doReqWithPerm(t *testing.T, signer *mjwt.Issuer, key, perm string, testStatus int, testBody string) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "https://example.com", nil)
 	req.Header.Set("Authorization", "Bearer "+key)
-	checkAuthWithPerm(signer, perm, func(rw http.ResponseWriter, req *http.Request, params httprouter.Params, b AuthClaims) {
+	checkAuthWithPerm(signer.KeyStore(), perm, func(rw http.ResponseWriter, req *http.Request, params httprouter.Params, b AuthClaims) {
 		assert.Equal(t, "Bearer "+key, req.Header.Get("Authorization"))
 		assert.Equal(t, "access-token", b.ClaimType)
 		assert.Equal(t, jwt.ClaimStrings{"example.com"}, b.Audience)
@@ -84,7 +81,7 @@ func TestCheckAuth(t *testing.T) {
 func TestCheckAuthWithPerm(t *testing.T) {
 	signer := genSigner(t)
 	t.Run("valid token", func(t *testing.T) {
-		ps := claims.NewPermStorage()
+		ps := auth.NewPermStorage()
 		ps.Set("test.perm")
 		key := mustGen(signer, "1234", "1234", jwt.ClaimStrings{"example.com"}, 15*time.Minute, &auth.AccessTokenClaims{
 			Perms: ps,
@@ -92,7 +89,7 @@ func TestCheckAuthWithPerm(t *testing.T) {
 		doReqWithPerm(t, signer, key, "test.perm", http.StatusOK, "OK\n")
 	})
 	t.Run("invalid token", func(t *testing.T) {
-		ps := claims.NewPermStorage()
+		ps := auth.NewPermStorage()
 		ps.Set("test.perm")
 		signer2 := genSigner(t)
 		key := mustGen(signer2, "1234", "1234", jwt.ClaimStrings{"example.com"}, 15*time.Minute, &auth.AccessTokenClaims{
@@ -101,7 +98,7 @@ func TestCheckAuthWithPerm(t *testing.T) {
 		doReqWithPerm(t, signer, key, "test.perm", http.StatusForbidden, "{\"error\":\"Invalid token\"}\n")
 	})
 	t.Run("invalid perm", func(t *testing.T) {
-		ps := claims.NewPermStorage()
+		ps := auth.NewPermStorage()
 		ps.Set("test2.perm")
 		key := mustGen(signer, "1234", "1234", jwt.ClaimStrings{"example.com"}, 15*time.Minute, &auth.AccessTokenClaims{
 			Perms: ps,
@@ -109,7 +106,7 @@ func TestCheckAuthWithPerm(t *testing.T) {
 		doReqWithPerm(t, signer, key, "test.perm", http.StatusForbidden, "{\"error\":\"No permission\"}\n")
 	})
 	t.Run("invalid perm and token", func(t *testing.T) {
-		ps := claims.NewPermStorage()
+		ps := auth.NewPermStorage()
 		ps.Set("test2.perm")
 		signer2 := genSigner(t)
 		key := mustGen(signer2, "1234", "1234", jwt.ClaimStrings{"example.com"}, 15*time.Minute, &auth.AccessTokenClaims{

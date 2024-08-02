@@ -6,7 +6,7 @@ import (
 	"github.com/1f349/azalea/database"
 	"github.com/1f349/azalea/resolver"
 	"github.com/1f349/mjwt"
-	"github.com/1f349/mjwt/claims"
+	"github.com/1f349/mjwt/auth"
 	"github.com/1f349/violet/utils"
 	"github.com/julienschmidt/httprouter"
 	"github.com/miekg/dns"
@@ -15,7 +15,7 @@ import (
 	"strings"
 )
 
-func NewApiServer(db *database.Queries, res *resolver.Resolver, verify mjwt.Verifier, authToken string) *httprouter.Router {
+func NewApiServer(db *database.Queries, res *resolver.Resolver, verify *mjwt.KeyStore, authToken string) *httprouter.Router {
 	r := httprouter.New()
 
 	r.GET("/", func(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
@@ -53,7 +53,7 @@ func apiError(rw http.ResponseWriter, code int, m string) {
 
 // getZoneOwnershipClaims returns the domains marked as owned from PermStorage,
 // they match `domain:owns=<fqdn>` where fqdn will be returned
-func getZoneOwnershipClaims(perms *claims.PermStorage) []string {
+func getZoneOwnershipClaims(perms *auth.PermStorage) []string {
 	a := perms.Search("domain:owns=*")
 	for i := range a {
 		a[i] = dns.Fqdn(a[i][len("domain:owns="):])
@@ -63,7 +63,7 @@ func getZoneOwnershipClaims(perms *claims.PermStorage) []string {
 
 // validateZoneOwnershipClaims validates if the claims contain the
 // `domain:owns=<fqdn>` field with the matching top level domain
-func validateZoneOwnershipClaims(a string, perms *claims.PermStorage) bool {
+func validateZoneOwnershipClaims(a string, perms *auth.PermStorage) bool {
 	a = strings.TrimRight(a, ".")
 	if fqdn, ok := utils.GetTopFqdn(a); ok {
 		if perms.Has("domain:owns=" + fqdn) {

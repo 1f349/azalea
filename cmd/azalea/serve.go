@@ -14,6 +14,7 @@ import (
 	"github.com/google/subcommands"
 	"github.com/mrmelon54/exit-reload"
 	"github.com/oschwald/geoip2-golang"
+	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 	"net/http"
 	"os"
@@ -80,7 +81,7 @@ func (s *serveCmd) Execute(_ context.Context, _ *flag.FlagSet, _ ...any) subcomm
 
 func normalLoad(startUp conf.Conf, wd string) {
 	// load the MJWT RSA public key from a pem encoded file
-	mJwtVerify, err := mjwt.NewMJwtVerifierFromFile(filepath.Join(wd, "signer.public.pem"))
+	mJwtVerify, err := mjwt.NewKeyStoreFromDir(afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(wd, "keys")))
 	if err != nil {
 		logger.Logger.Fatal("Failed to load MJWT verifier public key", "file", filepath.Join(wd, "signer.public.pem"), "err", err)
 	}
