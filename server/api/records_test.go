@@ -95,7 +95,7 @@ func TestAddRecordEndpoints(t *testing.T) {
 		doTestRequest(t, "invalid domain", req, r, http.StatusNotFound, "Invalid domain")
 		req = makeReq("{")
 		req.Header.Set("Authorization", "Bearer "+makeToken())
-		doTestRequest(t, "invalid json", req, r, http.StatusBadRequest, "Invalid JSON")
+		doTestRequest(t, "invalid json", req, r, http.StatusBadRequest, "Invalid JSON: unexpected EOF")
 		req = makeReq(`{"name":"ns1","type":1,"value":"10.23.41.5"}`)
 		req.Header.Set("Authorization", "Bearer "+makeToken())
 		doTestRequest(t, "ok", req, r, http.StatusCreated, `{"id":5}`)
@@ -158,6 +158,7 @@ func TestAddRecordEndpoints(t *testing.T) {
 		req = makeReq("")
 		req.Header.Set("Authorization", "Bearer "+makeToken())
 		encodeRR, err := json.Marshal(&models.Record{
+			Id:    1,
 			Name:  "example.com.",
 			Type:  dns.TypeA,
 			Value: &models.A{IP: net.IPv4(10, 0, 31, 1)},
@@ -174,7 +175,7 @@ func TestAddRecordEndpoints(t *testing.T) {
 		doTestRequest(t, "invalid domain", req, r, http.StatusNotFound, "Invalid domain")
 		req = makeReq("{")
 		req.Header.Set("Authorization", "Bearer "+makeToken())
-		doTestRequest(t, "invalid json", req, r, http.StatusBadRequest, "Invalid JSON")
+		doTestRequest(t, "invalid json", req, r, http.StatusBadRequest, "Invalid JSON: unexpected EOF")
 		req = baseMakeReq(http.MethodPut, "/domains/example.com/records/e3")("{}")
 		req.Header.Set("Authorization", "Bearer "+makeToken())
 		doTestRequest(t, "invalid record id", req, r, http.StatusBadRequest, "Invalid record ID")

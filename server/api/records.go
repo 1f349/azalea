@@ -9,6 +9,7 @@ import (
 	"github.com/1f349/azalea/models"
 	"github.com/1f349/mjwt"
 	validateDomain "github.com/chmike/domain"
+	"github.com/gobuffalo/nulls"
 	"github.com/julienschmidt/httprouter"
 	"github.com/miekg/dns"
 	"net/http"
@@ -31,6 +32,7 @@ type recordResolver interface {
 type recordValue struct {
 	Name  string          `json:"name"`
 	Type  uint16          `json:"type"`
+	Ttl   nulls.UInt32    `json:"ttl"`
 	Value json.RawMessage `json:"value"`
 }
 
