@@ -41,7 +41,7 @@ func (s *serveCmd) SetFlags(f *flag.FlagSet) {
 }
 
 func (s *serveCmd) Usage() string {
-	return `serve [-conf <config file>] [-debug]
+	return `serve [-conf <config file>] [-debug] [-pid-file <pid file>]
   Serve user authentication service using information from the config file
 `
 }
