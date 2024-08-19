@@ -11,20 +11,23 @@ import (
 	"github.com/1f349/azalea/server/api"
 	"github.com/1f349/mjwt"
 	"github.com/charmbracelet/log"
+	"github.com/cloudflare/tableflip"
 	"github.com/google/subcommands"
-	"github.com/mrmelon54/exit-reload"
 	"github.com/oschwald/geoip2-golang"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 )
 
 type serveCmd struct {
 	configPath string
 	debugLog   bool
+	pidFile    string
 }
 
 func (s *serveCmd) Name() string { return "serve" }
@@ -34,6 +37,7 @@ func (s *serveCmd) Synopsis() string { return "Serve user authentication service
 func (s *serveCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&s.configPath, "conf", "", "/path/to/config.json : path to the config file")
 	f.BoolVar(&s.debugLog, "debug", false, "enable debug logging")
+	f.StringVar(&s.pidFile, "pid-file", "", "path to pid file")
 }
 
 func (s *serveCmd) Usage() string {
@@ -47,6 +51,14 @@ func (s *serveCmd) Execute(_ context.Context, _ *flag.FlagSet, _ ...any) subcomm
 		logger.Logger.SetLevel(log.DebugLevel)
 	}
 	logger.Logger.Info("Starting...")
+
+	upg, err := tableflip.New(tableflip.Options{
+		PIDFile: s.pidFile,
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer upg.Stop()
 
 	if s.configPath == "" {
 		logger.Logger.Error("Config flag is missing")
@@ -75,42 +87,52 @@ func (s *serveCmd) Execute(_ context.Context, _ *flag.FlagSet, _ ...any) subcomm
 		logger.Logger.Fatal("Failed to get absolute config path", "err", err)
 	}
 	wd := filepath.Dir(configPathAbs)
-	normalLoad(config, wd)
-	return subcommands.ExitSuccess
-}
 
-func normalLoad(startUp conf.Conf, wd string) {
 	// load the MJWT RSA public key from a pem encoded file
 	mJwtVerify, err := mjwt.NewKeyStoreFromDir(afero.NewBasePathFs(afero.NewOsFs(), filepath.Join(wd, "keys")))
 	if err != nil {
 		logger.Logger.Fatal("Failed to load MJWT verifier public key", "file", filepath.Join(wd, "signer.public.pem"), "err", err)
 	}
 
-	db, err := azalea.InitDB(startUp.DB)
+	db, err := azalea.InitDB(config.DB)
 	if err != nil {
 		logger.Logger.Fatal("Failed to open database", "err", err)
 	}
 
 	var openGeo *geoip2.Reader
-	if startUp.GeoIP != "" {
-		logger.Logger.Info("Loading GeoIP database", "db", startUp.GeoIP)
-		openGeo, err = geoip2.Open(filepath.Join(wd, startUp.GeoIP))
+	if config.GeoIP != "" {
+		logger.Logger.Info("Loading GeoIP database", "db", config.GeoIP)
+		openGeo, err = geoip2.Open(filepath.Join(wd, config.GeoIP))
 		if err != nil {
 			logger.Logger.Fatal("Failed to open GeoIP DB", "err", err)
 		}
 	}
 
 	geoRes := resolver.NewGeoResolver(openGeo, db)
-	res := resolver.NewResolver(startUp.Soa, db, geoRes)
+	res := resolver.NewResolver(config.Soa, db, geoRes)
 
-	dnsSrv := server.NewDnsServer(startUp, res)
-	logger.Logger.Info("Starting server", "addr", dnsSrv.Addr)
+	dnsTcp, err := upg.Listen("tcp", config.Listen.Dns)
+	if err != nil {
+		logger.Logger.Fatal("Listen failed", "err", err)
+	}
+	dnsUdp, err := upg.ListenPacket("udp", config.Listen.Dns)
+	if err != nil {
+		logger.Logger.Fatal("Listen failed", "err", err)
+	}
+
+	dnsSrv := server.NewDnsServer(dnsTcp, dnsUdp, res)
+	logger.Logger.Info("Starting server", "addr", config.Listen.Dns)
 	dnsSrv.Run()
 
-	if startUp.Master {
-		apiMux := api.NewApiServer(db, res, mJwtVerify, startUp.MetricsAuth)
-		apiSrv := &http.Server{
-			Addr:              startUp.ApiListen,
+	var apiSrv *http.Server
+	if config.Master {
+		lnApi, err := upg.Listen("tcp", config.Listen.Api)
+		if err != nil {
+			logger.Logger.Fatal("Listen failed", "err", err)
+		}
+
+		apiMux := api.NewApiServer(db, res, mJwtVerify, config.MetricsAuth)
+		apiSrv = &http.Server{
 			Handler:           apiMux,
 			ReadTimeout:       time.Minute,
 			ReadHeaderTimeout: time.Minute,
@@ -120,15 +142,40 @@ func normalLoad(startUp conf.Conf, wd string) {
 		}
 		logger.Logger.Info("Starting API server", "addr", apiSrv.Addr)
 		go func() {
-			err := apiSrv.ListenAndServe()
+			err := apiSrv.Serve(lnApi)
 			if err != nil {
 				logger.Logger.Error("Failed to start API server", "err", err)
 			}
 		}()
 	}
 
-	exit_reload.ExitReload("Azalea", func() {}, func() {
-		// stop dns server
-		dnsSrv.Close()
+	// Do an upgrade on SIGHUP
+	go func() {
+		sig := make(chan os.Signal, 1)
+		signal.Notify(sig, syscall.SIGHUP)
+		for range sig {
+			err := upg.Upgrade()
+			if err != nil {
+				logger.Logger.Error("Failed upgrade", "err", err)
+			}
+		}
+	}()
+
+	logger.Logger.Info("Ready")
+	if err := upg.Ready(); err != nil {
+		panic(err)
+	}
+	<-upg.Exit()
+
+	time.AfterFunc(30*time.Second, func() {
+		logger.Logger.Warn("Graceful shutdown timed out")
+		os.Exit(1)
 	})
+
+	dnsSrv.Close()
+	if apiSrv != nil {
+		_ = apiSrv.Shutdown(context.Background())
+	}
+
+	return subcommands.ExitSuccess
 }
