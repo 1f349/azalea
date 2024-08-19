@@ -1,18 +1,18 @@
 package server
 
 import (
-	"github.com/1f349/azalea/conf"
 	"github.com/1f349/azalea/logger"
 	"github.com/1f349/azalea/resolver"
 	"github.com/miekg/dns"
 	"github.com/rcrowley/go-metrics"
+	"net"
 	"sync"
 	"time"
 )
 
 type DnsServer struct {
-	Addr      string
-	conf      conf.Conf
+	tcpSocket net.Listener
+	udpSocket net.PacketConn
 	mu        *sync.RWMutex
 	resolver  *resolver.Resolver
 	closeFunc func()
@@ -47,7 +47,7 @@ func (d *DnsServer) Run() {
 	udpHandler.HandleFunc(".", udpDnsHandler.Handle)
 
 	tcpServer := &dns.Server{
-		Addr:         d.conf.Listen,
+		Listener:     d.tcpSocket,
 		Net:          "tcp",
 		Handler:      tcpHandler,
 		ReadTimeout:  2 * time.Second,
@@ -55,7 +55,7 @@ func (d *DnsServer) Run() {
 	}
 
 	udpServer := &dns.Server{
-		Addr:         d.conf.Listen,
+		PacketConn:   d.udpSocket,
 		Net:          "udp",
 		Handler:      udpHandler,
 		UDPSize:      65535,
@@ -64,7 +64,7 @@ func (d *DnsServer) Run() {
 	}
 
 	start := func(server *dns.Server) {
-		err := server.ListenAndServe()
+		err := server.ActivateAndServe()
 		if err != nil {
 			logger.Logger.Error("Failed to start server", "err", err)
 		}
@@ -85,11 +85,11 @@ func (d *DnsServer) Close() {
 	}
 }
 
-func NewDnsServer(conf conf.Conf, res *resolver.Resolver) *DnsServer {
+func NewDnsServer(tcpSocket net.Listener, udpSocket net.PacketConn, res *resolver.Resolver) *DnsServer {
 	return &DnsServer{
-		Addr:     conf.Listen,
-		conf:     conf,
-		mu:       new(sync.RWMutex),
-		resolver: res,
+		tcpSocket: tcpSocket,
+		udpSocket: udpSocket,
+		mu:        new(sync.RWMutex),
+		resolver:  res,
 	}
 }
