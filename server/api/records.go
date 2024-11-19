@@ -30,6 +30,7 @@ type recordResolver interface {
 }
 
 type recordValue struct {
+	Id    uint64          `json:"id"` // allow this field even though it is ignored
 	Name  string          `json:"name"`
 	Type  uint16          `json:"type"`
 	Ttl   nulls.UInt32    `json:"ttl"`
