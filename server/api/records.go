@@ -156,6 +156,7 @@ func AddRecordEndpoints(r *httprouter.Router, db recordQueries, res recordResolv
 
 		// decode json data
 		var a struct {
+			Id    uint64          `json:"id"`
 			Value json.RawMessage `json:"value"`
 		}
 		dec := json.NewDecoder(req.Body)
