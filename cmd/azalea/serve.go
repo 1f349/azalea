@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"github.com/1f349/azalea"
 	"github.com/1f349/azalea/conf"
@@ -140,10 +141,15 @@ func (s *serveCmd) Execute(_ context.Context, _ *flag.FlagSet, _ ...any) subcomm
 			IdleTimeout:       time.Minute,
 			MaxHeaderBytes:    2500,
 		}
-		logger.Logger.Info("Starting API server", "addr", apiSrv.Addr)
+		logger.Logger.Info("Starting API server", "addr", config.Listen.Api)
 		go func() {
 			err := apiSrv.Serve(lnApi)
-			if err != nil {
+			switch {
+			case err == nil:
+				return
+			case errors.Is(err, http.ErrServerClosed):
+				return
+			default:
 				logger.Logger.Error("Failed to start API server", "err", err)
 			}
 		}()
