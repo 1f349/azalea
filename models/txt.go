@@ -34,3 +34,28 @@ func (txt TXT) ValueType() uint16 {
 func (txt TXT) EncodeValue() string {
 	return txt.Value
 }
+
+const maxSplitTxtSize = 255
+
+func splitTxtValue(s string) []string {
+	// exception for empty string rule
+	if s == "" {
+		return []string{""}
+	}
+
+	// calculate the expected number of items
+	lenS := len(s)
+	expected := lenS / maxSplitTxtSize
+	if len(s)%maxSplitTxtSize > 0 {
+		expected++
+	}
+
+	// construct the slice
+	a := make([]string, expected)
+	for i := 0; i < expected; i++ {
+		j := i * maxSplitTxtSize
+		end := min(j+maxSplitTxtSize, lenS)
+		a[i] = s[j:end]
+	}
+	return a
+}
