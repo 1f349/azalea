@@ -116,7 +116,7 @@ func (r *Resolver) Lookup(ctx context.Context, req *dns.Msg, addr net.Addr) (msg
 		missCounter.Inc(1)
 		msg.SetRcode(req, dns.RcodeNameError)
 		if soa != nil {
-			msg.Ns = []dns.RR{soa.RR(300)} // TODO(melon): per domain default ttl
+			msg.Ns = []dns.RR{soa.RR(300)} // TODO(melon): per domain default ttl (maybe use 172_800)
 		} else {
 			msg.Authoritative = false // No SOA? We're not authoritative
 		}
