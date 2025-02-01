@@ -40,10 +40,10 @@ func (d *DnsServer) Run() {
 		responseTimer:  udpResponseTimer,
 	}
 
-	udpHandler := dns.NewServeMux()
 	tcpHandler := dns.NewServeMux()
-
 	tcpHandler.HandleFunc(".", tcpDnsHandler.Handle)
+
+	udpHandler := dns.NewServeMux()
 	udpHandler.HandleFunc(".", udpDnsHandler.Handle)
 
 	tcpServer := &dns.Server{
